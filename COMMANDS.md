@@ -1,5 +1,35 @@
 # SMA Engine — Command Reference
 
+## Market Overlay
+
+```bash
+# Start overlay only (The System + Zero Gamma + Signals panel — lightweight)
+cd ~/Developer/sma_engine && ./start.sh overlay
+
+# Start everything (engines + pipeline + overlay)
+cd ~/Developer/sma_engine && ./start.sh
+
+# Stop everything
+cd ~/Developer/sma_engine && ./stop.sh
+
+# Open live dashboard in browser (auto-refreshes every 60s)
+open ~/Developer/sma_engine/market_overlay/dashboard.html
+
+# Force sync all engine outputs to Google Sheets immediately
+cd ~/Developer/sma_engine/market_overlay && python3 sheets_sync.py
+
+# Run The System analysis standalone
+cd ~/Developer/sma_engine/market_overlay && python3 the_system.py
+
+# Check zero gamma (Tikitrade)
+cd ~/Developer/sma_engine/market_overlay && python3 gamma_engine.py
+
+# Check index GEX (QQQ/IWM/DIA)
+cd ~/Developer/sma_engine/market_overlay && python3 index_gex.py
+```
+
+---
+
 ## Engine Management
 
 ```bash

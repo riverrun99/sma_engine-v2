@@ -2,6 +2,73 @@
 
 ---
 
+## 2026-06-09 — Market Overlay, Zero Gamma, The System, Live Dashboard
+
+All new code lives in `market_overlay/`. Zero changes to original engine files.
+
+### `market_overlay/the_system.py` — New File
+TraderBJones "The System" implementation on SPY 30m data.
+- Indicators: SMA10, SMA50, SMA200, EMA9, EMA21, EMA50
+- State: UP (UPRO) when SMA10 > SMA50, DOWN (SPXU) otherwise
+- Entry types: CROSS (SMA10/50 + EMA9/50 confirmation), BOUNCE (extreme oversold + reclaim SMA10)
+- Two-step bearish logic: GO TO CASH when SMA50 not yet sloping down; ENTER SHORT when SMA50 falling
+- Choppy detection: SMA10/50 spread < 0.3% → sit on cash
+- NASDAQ leading indicator: fetches QQQ 30m, reports state/direction/relative performance vs SPY
+- Fallback to yfinance if Webull unavailable
+
+### `market_overlay/gamma_engine.py` — New File
+SPX zero gamma via Tikitrade free data (no API key, no rate limiting).
+- Scrapes `tikitrade.com/gamma` HTML at 9:30 AM ET
+- Parses: Zero Gamma, Call/Put Walls, Max Pain, Expected Move, Vanna Inflection, Basis Shift
+- Module-level stale-data cache for resilience between refreshes
+- Replaced yfinance options chain approach entirely — eliminates rate limiting
+
+### `market_overlay/flashalpha_gex.py` — New File
+Single-stock GEX for top triangulated signals via FlashAlpha free tier.
+- Free tier: 5 calls/day. Daily disk cache (`.gex_cache.json`) preserves budget.
+- Returns regime badge: positive γ or negative γ per ticker
+- Silent no-op if `FLASHALPHA_API_KEY` not set in `.env`
+
+### `market_overlay/index_gex.py` — New File
+Index-level zero gamma for QQQ, IWM, DIA from yfinance options chains.
+- Black-Scholes gamma × OI, cumulative zero-crossing with linear interpolation
+- Daily cache — hits yfinance once per day only
+- Spot price hints passed from The System to avoid duplicate fetches
+
+### `market_overlay/sheets_sync.py` — New File
+Syncs all engine output categories to Google Sheets.
+- Tabs written: Discovery, Confluence, Backtest, Trades, Normalized, V3, Triangulation, Overlay
+- Does NOT touch original `sheets_writer.py` or Current/Log tabs
+- Reads from `GOOGLE_SHEETS_CREDENTIALS_PATH` and `GOOGLE_SHEET_ID` in `.env`
+- Graceful no-op if credentials not configured
+- Standalone: `python3 market_overlay/sheets_sync.py`
+
+### `market_overlay/overlay.py` — New File
+Terminal UI combining all data sources into a live Rich dashboard.
+- Panels: The System, Zero Gamma (SPX), Index GEX (QQQ/IWM/DIA), Synthesis, Market Read, Macro, Signals
+- Plain-English "Market Read" panel — rule-based narrative, zero API cost, updates every refresh
+- Writes `latest_snapshot.json` and `dashboard.html` each cycle
+- Syncs all output categories to Google Sheets each cycle
+- FlashAlpha GEX badges on top 5 triangulated signals
+- Refresh: every 60 seconds
+
+### `market_overlay/dashboard.html` — Generated File (gitignored)
+Self-contained HTML dashboard regenerated each overlay cycle.
+- Open in any browser — auto-refreshes every 60 seconds
+- Plain-English narrative, System state, Zero Gamma, index GEX, top signals
+- No API calls, no external dependencies
+
+### `.env` — Updated
+- Added `FLASHALPHA_API_KEY=` entry for FlashAlpha free-tier key
+
+### `.gitignore` — Updated
+- Added exclusions for `market_overlay/dashboard.html`, `latest_snapshot.json`, `.gex_cache.json`
+
+### `CHANGELOG.md` — New File
+Full architectural overview with security notes. See `CHANGELOG.md`.
+
+---
+
 ## 2026-06-04 — Performance & Stability Overhaul
 
 ### engine.py

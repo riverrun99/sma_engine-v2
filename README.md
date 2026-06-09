@@ -398,6 +398,28 @@ docker compose up -d --build engine
 After the next cycle the sheet has two tabs: **Current** (overwritten) and
 **Log** (appended).
 
+### Additional tabs via Market Overlay
+
+Once the same credentials are set, the market overlay automatically syncs
+additional tabs each refresh cycle:
+
+| Tab | Contents |
+|-----|----------|
+| Discovery | Latest discovery engine output |
+| Confluence | Latest confluence engine output |
+| Backtest | Latest backtest results |
+| Trades | Latest trade engine suggestions |
+| Normalized | Normalized engine output |
+| V3 | V3 engine output |
+| Triangulation | Top triangulated signals with scores |
+| Overlay | The System state + Zero Gamma snapshot |
+
+To force a sync immediately without running the full overlay:
+
+```bash
+cd ~/Developer/sma_engine/market_overlay && python3 sheets_sync.py
+```
+
 ---
 
 ## Remote access via Tailscale
