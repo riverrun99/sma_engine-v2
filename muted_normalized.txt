@@ -1,0 +1,20 @@
+# Muted tickers — normalized engine
+# These tickers are commented out in normalized_tickers.txt
+# Reason: low price, low volatility, or range-bound — generate noise on 1m
+
+IEF
+SHY
+HYG
+JNK
+TIP
+AGG
+RXRX
+DOMO
+AMPL
+EDIT
+FATE
+RCKT
+NFE
+ANGI
+GGLS
+AMDD

@@ -1,0 +1,78 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# Secrets — never commit Webull credentials or InfluxDB tokens
+.env
+.env.local
+.env.*.local
+secrets/
+*.pem
+*.key
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Data / output
+data/
+output/
+*.parquet
+*.csv
+*.log
+cache/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Docker volumes (created by docker-compose, should not be tracked)
+influxdb_data/
+grafana_data/
+engine_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Google service account key and other JSON credentials
+credentials/
+*.json
+
+# Market overlay — generated files (rebuilt each cycle, contain live data)
+market_overlay/dashboard.html
+market_overlay/latest_snapshot.json
+market_overlay/.gex_cache.json

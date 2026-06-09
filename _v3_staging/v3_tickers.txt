@@ -1,0 +1,898 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# v3_tickers.txt — Custom universe for engine_v3.py
+# 720 tickers covering all sectors, commodities, indices, leveraged ETFs
+# DO NOT use this file with engine.py — normalized engine only
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Indices & benchmarks ─────────────────────────────────────────────────────
+SPX
+IXIC
+DJI
+VIX
+TNX
+DXY
+HSI
+DAX
+BTCUSD
+ETHUSD
+XAUUSD
+
+# ── Core broad ETFs ───────────────────────────────────────────────────────────
+SPY
+QQQ
+DIA
+IWM
+IVV
+VOO
+RSP
+QQQM
+IWV
+VTI
+EFA
+EEM
+VWO
+ACWI
+IWB
+
+# ── S&P 500 leveraged ─────────────────────────────────────────────────────────
+UPRO
+SPXU
+SPXL
+SPXS
+SSO
+SDS
+SH
+SPDN
+
+# ── Nasdaq leveraged ──────────────────────────────────────────────────────────
+TQQQ
+SQQQ
+QLD
+QID
+PSQ
+
+# ── Dow leveraged ─────────────────────────────────────────────────────────────
+UDOW
+SDOW
+DDM
+DXD
+DOG
+
+# ── Russell leveraged ─────────────────────────────────────────────────────────
+TNA
+TZA
+URTY
+SRTY
+UWM
+TWM
+RWM
+
+# ── Volatility ────────────────────────────────────────────────────────────────
+UVXY
+SVXY
+VXX
+VIXY
+SVIX
+UVIX
+VIXM
+
+# ── Semiconductors ETFs ───────────────────────────────────────────────────────
+SMH
+SOXX
+SOXL
+SOXS
+SOXQ
+QTUM
+
+# ── SPDR sector ETFs (all 11) ─────────────────────────────────────────────────
+XLF
+XLK
+XLV
+XLI
+XLY
+XLP
+XLU
+XLB
+XLRE
+XLC
+XLE
+
+# ── Sub-sector ETFs ───────────────────────────────────────────────────────────
+XBI
+XOP
+XHB
+XRT
+XME
+KRE
+KBE
+IBB
+IGV
+IYR
+CIBR
+ICLN
+TAN
+LIT
+COPX
+
+# ── Sector leveraged ETFs ─────────────────────────────────────────────────────
+FAS
+FAZ
+ERX
+DRIP
+GUSH
+TECL
+TECS
+LABU
+LABD
+FNGU
+FNGD
+DPST
+NUGT
+DUST
+JNUG
+JDST
+NAIL
+CURE
+DFEN
+BNKU
+BULZ
+HIBL
+HIBS
+WEBL
+WEBS
+DRN
+DRV
+MIDU
+RETL
+UTSL
+TPOR
+PILL
+WANT
+BRZU
+INDL
+
+# ── Single-stock leveraged ETFs ───────────────────────────────────────────────
+TSLL
+TSLS
+NVDL
+NVDS
+MSTU
+MSTZ
+MSTX
+NVDX
+GGLL
+GGLS
+MSFU
+MSFD
+NVDD
+AAPB
+AMZU
+NVDU
+TSLQ
+TSLT
+QPUX
+QQQU
+
+# ── Bitcoin & crypto ETFs ─────────────────────────────────────────────────────
+GBTC
+IBIT
+FBTC
+ARKB
+BITU
+SBIT
+BITO
+BITI
+
+# ── Precious metals ───────────────────────────────────────────────────────────
+GLD
+IAU
+GDX
+GDXJ
+SLV
+PSLV
+UGL
+GLL
+AGQ
+ZSL
+GLDM
+SIL
+
+# ── Energy & oil/gas ETFs ─────────────────────────────────────────────────────
+USO
+UCO
+SCO
+UNG
+BOIL
+KOLD
+BNO
+DIG
+DUG
+XOP
+
+# ── Broad commodities ─────────────────────────────────────────────────────────
+PDBC
+DBB
+DBA
+GUNR
+PICK
+
+# ── Bonds & rates ─────────────────────────────────────────────────────────────
+TLT
+TMF
+TMV
+TBT
+ZROZ
+# IEF   # muted
+# SHY   # muted
+# HYG   # muted
+LQD
+# JNK   # muted
+# TIP   # muted
+# AGG   # muted
+
+# ── China & Asia ──────────────────────────────────────────────────────────────
+YINN
+YANG
+FXI
+MCHI
+KWEB
+EWJ
+EWH
+CWEB
+FEZ
+KORU
+
+# ── International broad ───────────────────────────────────────────────────────
+EWZ
+INDA
+EWG
+EWU
+EWC
+EWT
+EWY
+VGK
+VXUS
+EDC
+
+# ── Thematic & factor ETFs ────────────────────────────────────────────────────
+ARKK
+ARKG
+ARKW
+ARKF
+JETS
+ICLN
+URA
+URNM
+BLOK
+ROBO
+AIQ
+BOTZ
+HACK
+CIBR
+MOO
+WEAT
+MSOS
+BETZ
+
+# ── Crypto-adjacent stocks ────────────────────────────────────────────────────
+COIN
+MSTR
+MARA
+RIOT
+CLSK
+BTBT
+HOOD
+SQ
+
+# ── Mega cap tech ─────────────────────────────────────────────────────────────
+AAPL
+MSFT
+NVDA
+GOOGL
+GOOG
+META
+AMZN
+TSLA
+AVGO
+AMD
+PLTR
+NFLX
+ORCL
+CRM
+ADBE
+INTC
+QCOM
+MU
+ARM
+SMCI
+ANET
+MRVL
+
+# ── Semiconductors individual ─────────────────────────────────────────────────
+TSM
+ASML
+LRCX
+KLAC
+AMAT
+TXN
+ON
+CSCO
+IBM
+MPWR
+
+# ── Financials ────────────────────────────────────────────────────────────────
+JPM
+BAC
+WFC
+GS
+MS
+C
+V
+MA
+BRK-B
+BLK
+SCHW
+KKR
+BX
+AXP
+COF
+SPGI
+CME
+ICE
+NDAQ
+MSCI
+GPN
+IBKR
+USB
+TFC
+PNC
+
+# ── Healthcare & pharma ───────────────────────────────────────────────────────
+UNH
+LLY
+JNJ
+MRK
+PFE
+ABT
+TMO
+DHR
+AMGN
+GILD
+REGN
+VRTX
+ISRG
+MRNA
+ZTS
+BSX
+SYK
+MDT
+ELV
+CI
+CVS
+HUM
+DXCM
+IDXX
+PODD
+
+# ── Energy majors ─────────────────────────────────────────────────────────────
+XOM
+CVX
+COP
+OXY
+SLB
+EOG
+DVN
+HAL
+MPC
+VLO
+PSX
+WMB
+KMI
+LNG
+APA
+OVV
+FANG
+HES
+MRO
+BP
+
+# ── Consumer discretionary ────────────────────────────────────────────────────
+HD
+MCD
+NKE
+SBUX
+LOW
+TJX
+LULU
+BKNG
+RCL
+MAR
+DIS
+ABNB
+DASH
+UBER
+SHOP
+ETSY
+W
+CMG
+DRI
+YUM
+
+# ── Consumer staples ──────────────────────────────────────────────────────────
+WMT
+PG
+KO
+PEP
+COST
+MDLZ
+PM
+MO
+CL
+GIS
+KHC
+STZ
+
+# ── Industrials & defense ─────────────────────────────────────────────────────
+CAT
+DE
+HON
+GE
+RTX
+LMT
+NOC
+BA
+UPS
+FDX
+NSC
+URI
+AXON
+GEV
+GD
+PH
+EMR
+ROK
+WM
+CTAS
+
+# ── Materials ─────────────────────────────────────────────────────────────────
+LIN
+APD
+SHW
+NEM
+GOLD
+FCX
+ALB
+AA
+VMC
+MLM
+NUE
+CLF
+WPM
+LTHM
+MP
+
+# ── Utilities & nuclear ───────────────────────────────────────────────────────
+NEE
+DUK
+SO
+AEP
+EXC
+SRE
+XEL
+ED
+PCG
+CEG
+VST
+AWK
+WEC
+SMR
+OKLO
+
+# ── REITs ─────────────────────────────────────────────────────────────────────
+AMT
+PLD
+EQIX
+CCI
+SPG
+O
+VICI
+PSA
+EQR
+IRM
+DLR
+WELL
+VTR
+AVB
+SUI
+
+# ── Communication services & media ───────────────────────────────────────────
+T
+VZ
+TMUS
+SNAP
+RDDT
+RBLX
+EA
+TTWO
+SPOT
+ROKU
+LYV
+MSGS
+
+# ── High-growth tech & cloud ──────────────────────────────────────────────────
+NET
+SNOW
+DDOG
+NOW
+CRWD
+PANW
+ZS
+FTNT
+TWLO
+HUBS
+BILL
+GTLB
+MNDY
+ASAN
+DOCN
+# RXRX   # muted
+NBIS
+CRWV
+VRT
+TOST
+
+# ── EV & mobility ────────────────────────────────────────────────────────────
+RIVN
+NIO
+LI
+XPEV
+ONON
+AUR
+RKLB
+ASTS
+
+# ── Uranium & nuclear materials ───────────────────────────────────────────────
+URA
+URNM
+LEU
+CCJ
+UUUU
+
+# ── Additional tech & software ────────────────────────────────────────────────
+UBER
+LYFT
+ABNB
+DASH
+PAYC
+PCTY
+APPF
+DOCU
+ZM
+OKTA
+ESTC
+MDB
+CFLT
+# DOMO   # muted
+JAMF
+SMAR
+SPRK
+BRZE
+# AMPL   # muted
+ZETA
+
+# ── Additional semiconductors ─────────────────────────────────────────────────
+WOLF
+SWKS
+QRVO
+NXPI
+MCHP
+MTSI
+LSCC
+RMBS
+SITM
+DIOD
+COHU
+ACLS
+IPGP
+LITE
+VIAV
+COHR
+
+# ── Additional financials ─────────────────────────────────────────────────────
+RJF
+LPLA
+TROW
+AMG
+APAM
+MCO
+ALLY
+DFS
+SYF
+COF
+RE
+MKL
+AJG
+MMC
+AON
+WTW
+ERIE
+BRO
+RYAN
+FNF
+
+# ── Additional healthcare ─────────────────────────────────────────────────────
+ALGN
+HOLX
+RMD
+TECH
+BAX
+HSIC
+INCY
+JAZZ
+NBIX
+IONS
+SRPT
+BMRN
+ALNY
+ARWR
+BEAM
+# EDIT   # muted
+# FATE   # muted
+# RCKT   # muted
+SGEN
+NVAX
+
+# ── Additional energy ─────────────────────────────────────────────────────────
+PDCE
+SM
+MTDR
+CHRD
+BKR
+NOV
+HP
+PTEN
+RIG
+MMP
+# NFE   # muted
+DKL
+PARR
+CRC
+SLB
+
+# ── Additional consumer discretionary ────────────────────────────────────────
+ROST
+DLTR
+DG
+QSR
+DPZ
+EL
+ULTA
+CZR
+MGM
+WYNN
+LVS
+PENN
+DKNG
+F
+GM
+
+# ── Additional consumer staples ───────────────────────────────────────────────
+MNST
+TAP
+BG
+ADM
+CTVA
+CHD
+CPB
+HRL
+SJM
+CAG
+MKC
+K
+
+# ── Additional industrials ────────────────────────────────────────────────────
+ITW
+PH
+CMI
+XYL
+OTIS
+CARR
+TDG
+HWM
+SPR
+HII
+TXT
+LDOS
+SAIC
+BAH
+EXPD
+CHRW
+XPO
+ODFL
+SAIA
+JBHT
+
+# ── Additional materials ──────────────────────────────────────────────────────
+LYB
+CF
+MOS
+DOW
+ECL
+FMC
+RPM
+HUN
+ATI
+STLD
+RS
+CMC
+SQM
+VALE
+RIO
+
+# ── Additional utilities ──────────────────────────────────────────────────────
+AEE
+CMS
+CNP
+ETR
+FE
+LNT
+NI
+EVRG
+ATO
+PNW
+OGE
+AWR
+
+# ── Additional REITs ──────────────────────────────────────────────────────────
+ARE
+BXP
+KIM
+REG
+FRT
+NNN
+MPW
+OHI
+COLD
+STAG
+REXR
+ELS
+UDR
+GLPI
+AIRC
+
+# ── Additional comm services ──────────────────────────────────────────────────
+TTWO
+IAC
+# ANGI   # muted
+YELP
+EXPE
+BKNG
+MTCH
+BMBL
+ATVI
+U
+RBLX
+
+# ── Additional international ETFs ────────────────────────────────────────────
+EWJ
+EWZ
+EWH
+EWG
+EWU
+EWC
+EWT
+EWY
+EWA
+IEMG
+VEA
+VEU
+DEM
+EMXC
+FEZ
+
+# ── Additional thematic ETFs ──────────────────────────────────────────────────
+ARKX
+ARKQ
+HERO
+ESPO
+NERD
+GAMR
+WCLD
+SKYY
+DTCR
+SRVR
+IRBO
+THNQ
+LRNZ
+SNSR
+FIVG
+NXTG
+XTLN
+MEME
+BUZZ
+
+# ── Additional crypto & blockchain ───────────────────────────────────────────
+HUT
+CIFR
+GLXY
+ETHD
+EETH
+CONI
+BITU
+SBIT
+HODL
+BTF
+BITW
+
+# ── Inverse & bear ETFs ───────────────────────────────────────────────────────
+# Broad market inverse
+SH          # S&P 500 1x inverse
+SDS         # S&P 500 2x inverse
+SPXU        # S&P 500 3x inverse
+SPXS        # S&P 500 3x inverse (Direxion)
+SPDN        # S&P 500 1x inverse (Invesco)
+PSQ         # Nasdaq 1x inverse
+QID         # Nasdaq 2x inverse
+SQQQ        # Nasdaq 3x inverse
+DOG         # Dow 1x inverse
+DXD         # Dow 2x inverse
+SDOW        # Dow 3x inverse
+RWM         # Russell 2000 1x inverse
+TWM         # Russell 2000 2x inverse
+TZA         # Russell 2000 3x inverse
+SRTY        # Russell 2000 3x inverse (ProShares)
+MYY         # S&P MidCap 400 1x inverse
+MZZ         # S&P MidCap 400 2x inverse
+SMDD        # MidCap 2x inverse
+UMDD        # MidCap 3x inverse
+
+# Sector inverse
+SEF         # Financials 1x inverse
+FAZ         # Financials 3x inverse
+TECS        # Technology 3x inverse
+SCC         # Consumer Discretionary 2x inverse
+SZK         # Consumer Staples 2x inverse
+DUG         # Oil & Gas 2x inverse
+DRIP        # Energy 3x inverse
+LABD        # Biotech 3x inverse
+SOXS        # Semiconductors 3x inverse
+WEBS        # Internet 3x inverse
+HIBS        # High Beta 3x inverse
+DRV         # Real Estate 3x inverse
+RETL        # Retail 3x inverse (bear)
+REK         # Real Estate 1x inverse
+YANG        # China 3x inverse
+EDZ         # Emerging Markets 3x inverse
+EPV         # Europe 2x inverse
+FXP         # China 50 2x inverse
+EEV         # EM 2x inverse
+
+# Single-stock inverse/bear
+TSLS        # Tesla 2x inverse
+NVDS        # Nvidia 2x inverse
+NVDD        # Nvidia 1x inverse
+# GGLS   # muted
+MSFD        # Microsoft 1x inverse
+MSTZ        # MicroStrategy 2x inverse
+TSLQ        # Tesla inverse (AXS)
+NVD         # Nvidia 1x inverse (GraniteShares)
+# AMDD   # muted
+TSMZ        # TSM inverse
+ORCX        # Oracle inverse
+METD        # META 1x inverse
+ELIS        # LLY 1x inverse
+PLTD        # Palantir inverse
+SMST        # SMCI inverse
+QQQD        # Mag7 1x inverse
+
+# Rates/bond inverse
+TBT         # 20yr Treasury 2x inverse
+TMV         # Treasury 3x inverse
+PST         # 7-10yr Treasury 2x inverse
+DGZ         # Gold 1x inverse
+GLL         # Gold 2x inverse
+ZSL         # Silver 2x inverse
+SCO         # Crude Oil 2x inverse
+KOLD        # Natural Gas 2x inverse
+SBIT        # Bitcoin 1x inverse
+BITI        # Bitcoin inverse

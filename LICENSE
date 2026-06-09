@@ -1,0 +1,75 @@
+SMA Outfit Detection Engine — License
+
+Copyright (c) 2026 Element 47 / @wolfkhare. All rights reserved.
+
+This software is made available exclusively to active subscribers of the
+Element 47 Patreon at the Institutional tier or higher. By accessing,
+downloading, installing, or using this software, you represent and warrant
+that you are such a subscriber at the time of access and use.
+
+PERMITTED USE
+
+  Subject to maintaining an active eligible subscription, you may:
+
+    1. Install and run this software on hardware you personally own or
+       control, for your own personal trading research and analysis.
+
+    2. Modify the source code for your own personal use, including writing
+       additional code that builds on top of this software.
+
+    3. Share screenshots or descriptions of your results, provided you do
+       not publish or distribute the source code or compiled binaries.
+
+PROHIBITED USE
+
+  You may not:
+
+    1. Redistribute, sublicense, publish, or share the source code with
+       any person who is not themselves an active eligible subscriber.
+
+    2. Mirror this code to a public repository, GitHub gist, pastebin, or
+       any other publicly accessible location.
+
+    3. Use this software to provide a commercial service to third parties,
+       whether for a fee or otherwise, including without limitation any
+       signal subscription service, brokerage tool, or trading platform.
+
+    4. Remove, alter, or obscure any copyright notice, attribution, or
+       license terms included in the software.
+
+TERMINATION
+
+  Your license to use this software terminates automatically and without
+  notice if your eligible subscription lapses for any reason. Upon
+  termination, you must promptly delete all copies of the software from
+  any device or storage medium under your control.
+
+NO WARRANTY
+
+  This software is provided "as is" without warranty of any kind, express
+  or implied, including but not limited to warranties of merchantability,
+  fitness for a particular purpose, or non-infringement. In particular,
+  this software is not financial advice, not investment advice, not a
+  recommendation to trade, and not a guarantee of any outcome whatsoever.
+
+  Trading securities involves risk of loss. The signals, rankings,
+  backtested results, regime predictions, and any other output produced
+  by this software are exploratory analytical outputs only. Past
+  performance, including backtested past performance, does not predict
+  future results. You are solely responsible for any trading decisions
+  you make and any losses you incur.
+
+LIMITATION OF LIABILITY
+
+  In no event shall the copyright holder be liable for any claim, damages,
+  or other liability, whether in an action of contract, tort, or otherwise,
+  arising from, out of, or in connection with the software or the use or
+  other dealings in the software, including without limitation any trading
+  losses, data loss, system outages, or consequential damages of any kind.
+
+THIRD-PARTY COMPONENTS
+
+  This software incorporates open-source libraries which are licensed under
+  their own respective terms. The license terms of this software apply only
+  to the original code contained in this repository and do not modify or
+  supersede the licenses of any third-party dependencies.

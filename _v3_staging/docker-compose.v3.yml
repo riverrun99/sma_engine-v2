@@ -1,0 +1,56 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Engine V3 — Level Significance + Sequential Conditional
+#
+# Completely separate container from e47_engine and e47_engine_normalized.
+# Mounts sma_engine (original) read-only for shared code (outfits, clients).
+# Mounts sma_engine_v3 read-only for v3-specific code.
+#
+# Start:   docker-compose -f docker-compose.v3.yml up -d
+# Stop:    docker-compose -f docker-compose.v3.yml down
+# Logs:    docker logs e47_engine_v3 -f
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  engine_v3:
+    build:
+      context: ../sma_engine
+      dockerfile: Dockerfile
+    working_dir: /cache
+    container_name: e47_engine_v3
+    restart: unless-stopped
+    stop_grace_period: 120s
+    volumes:
+      - ../sma_engine:/app:ro
+      - ./:/app_v3:ro
+      - ../sma_engine/output/v3:/cache/output/v3
+      - engine_v3_cache:/cache
+    environment:
+      # ── InfluxDB ─────────────────────────────────────────────────────────
+      INFLUX_URL:    http://influxdb:8086
+      INFLUX_TOKEN:  element47-dev-token
+      INFLUX_ORG:    element47
+      INFLUX_BUCKET: sma_engine
+      # ── Webull ───────────────────────────────────────────────────────────
+      WEBULL_APP_KEY:    ${WEBULL_APP_KEY:-}
+      WEBULL_APP_SECRET: ${WEBULL_APP_SECRET:-}
+      WEBULL_REGION:     ${WEBULL_REGION:-us}
+      ENGINE_SOURCE:     ${ENGINE_SOURCE:-webull}
+      # ── V3 settings ──────────────────────────────────────────────────────
+      V3_INTERVAL_SECONDS: ${V3_INTERVAL_SECONDS:-600}
+      V3_TOP_N:            ${V3_TOP_N:-500}
+      V3_LOOKBACK:         ${V3_LOOKBACK:-390}
+      V3_TIMEFRAMES:       ${V3_TIMEFRAMES:-1m,5m,15m,30m,1h,2h,4h,1d,1w,1mo}
+      V3_MIN_SCORE:        ${V3_MIN_SCORE:-0}
+      V3_SCAN_WORKERS:     ${V3_SCAN_WORKERS:-6}
+      PYTHONUNBUFFERED:    "1"
+    command: python3 /app_v3/daemon_v3.py
+    networks:
+      - sma_engine_default
+
+networks:
+  sma_engine_default:
+    external: true
+    name: sma_engine_default
+
+volumes:
+  engine_v3_cache:

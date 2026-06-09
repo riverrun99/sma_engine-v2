@@ -1,0 +1,113 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SMA Outfit Engine — full stack
+#
+#   influxdb:  time-series database for candles, hits, signals, regimes
+#   grafana:   dashboards (provisioned automatically from ./grafana)
+#   engine:    the SMA engine, runs scans on a schedule and writes to InfluxDB
+#
+# Quick start:
+#   docker-compose up -d
+#   open http://localhost:3001  (admin / element47)
+#
+# Defaults are dev-grade (single-token, no TLS). For production:
+#   - rotate INFLUX_TOKEN
+#   - put behind a reverse proxy with TLS
+#   - mount Webull credentials via Docker secrets, not env vars
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  influxdb:
+    image: influxdb:2.7
+    container_name: e47_influxdb
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+      - influxdb_config:/etc/influxdb2
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: element47
+      DOCKER_INFLUXDB_INIT_PASSWORD: element47-dev-password
+      DOCKER_INFLUXDB_INIT_ORG: element47
+      DOCKER_INFLUXDB_INIT_BUCKET: sma_engine
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: element47-dev-token
+      DOCKER_INFLUXDB_INIT_RETENTION: 90d
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: e47_grafana
+    restart: unless-stopped
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: element47
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_INSTALL_PLUGINS: ""
+
+  engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /cache
+    container_name: e47_engine
+    restart: unless-stopped
+    stop_grace_period: 120s
+    depends_on:
+      influxdb:
+        condition: service_healthy
+    volumes:
+      - ./:/app:ro
+      - ./output:/cache/output
+      - engine_cache:/cache
+    environment:
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: element47-dev-token
+      INFLUX_ORG: element47
+      INFLUX_BUCKET: sma_engine
+      # Webull credentials — set in .env or override at runtime
+      WEBULL_APP_KEY: ${WEBULL_APP_KEY:-}
+      WEBULL_APP_SECRET: ${WEBULL_APP_SECRET:-}
+      WEBULL_REGION: ${WEBULL_REGION:-us}
+      # Engine config
+      ENGINE_SOURCE: ${ENGINE_SOURCE:-mock}
+      ENGINE_UNIVERSE: ${ENGINE_UNIVERSE:-tier1}
+      ENGINE_INTERVAL_SECONDS: ${ENGINE_INTERVAL_SECONDS:-300}
+      ENGINE_TOP_N: ${ENGINE_TOP_N:-50}
+      ENGINE_TIMEFRAMES: ${ENGINE_TIMEFRAMES:-5m,15m,30m,1h,1d}
+      ENGINE_LOOKBACK: ${ENGINE_LOOKBACK:-130}
+      ENGINE_REGIME_EVERY: ${ENGINE_REGIME_EVERY:-12}
+      ENGINE_SCAN_WORKERS: ${ENGINE_SCAN_WORKERS:-3}
+      ENGINE_REFRESH_BARS: ${ENGINE_REFRESH_BARS:-20}
+      ENGINE_MIN_TF_MINUTES: ${ENGINE_MIN_TF_MINUTES:-15}
+      HIT_MODE: ${HIT_MODE:-exact}
+      HIT_TOLERANCE: ${HIT_TOLERANCE:-0.0}
+      STREAM_ENABLED: ${STREAM_ENABLED:-false}
+      STREAM_TIMEFRAMES: ${STREAM_TIMEFRAMES:-1s,5s,15s,30s}
+      ENGINE_BACKTEST_EVERY: ${ENGINE_BACKTEST_EVERY:-0}
+      TERMINAL_UI: ${TERMINAL_UI:-true}
+      TERMINAL_TOP_N: ${TERMINAL_TOP_N:-20}
+      LOCAL_OUTPUT_DIR: /cache/output
+      GOOGLE_SHEETS_CREDENTIALS_PATH: ${GOOGLE_SHEETS_CREDENTIALS_PATH:-}
+      GOOGLE_SHEET_ID: ${GOOGLE_SHEET_ID:-}
+    command: python3 /app/daemon.py
+
+volumes:
+  influxdb_data:
+  influxdb_config:
+  grafana_data:
+  engine_cache:
