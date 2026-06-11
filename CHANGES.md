@@ -2,6 +2,61 @@
 
 ---
 
+## 2026-06-10 — Systems Panel, Forward Return Tracker, System Logic Doc
+
+All new code in new files only. Zero changes to original engine files.
+
+### `market_overlay/systems_panel.py` — New File
+Live state display for all TraderBJones index systems, pulled via yfinance (5-min cache).
+- **SPX 30m [10/50/200]** — MA10 vs MA50, vehicle UPRO/SPXU
+- **IXIC 30m [20/100/250]** — MA20 vs MA100, vehicle TQQQ/SQQQ
+- **DJI 15m [90/300]** — active operations timeframe, vehicle UDOW/SDOW
+- **DJI 1H [90/300/900]** — structural confirmation timeframe
+- **IWM 2H [16/250/500]** — 1h bars resampled to 2h, MA16 vs MA250
+- **IWV 2H [16/250/500]** — Russell 3000 broad market read
+- **SOX 30m [16/256/512]** — Base-2/NVDA outfit, vehicles SOXL/SOXS
+- **VIX 1H [26/422]** — MA26 > MA422 flags HIGH-VOL regime active
+- **SVIX 1D [116/211/422]** — cluster convergence ~20 = structural support
+- Under HIGH-VOL, panel flags the key MA level each system shifts to (close-based rule)
+- Alignment summary: ALL POSITIVE / ALL NEGATIVE / MIXED with fill-the-bucket note
+- Standalone: `python3 market_overlay/systems_panel.py`
+
+### `market_overlay/overlay.py` — Updated
+- Imported `systems_panel` module
+- Added `size=20` layout row between Narrative and bottom panels
+- `fetch_all()` calls `systems_panel.fetch_all_systems()` each cycle (cached, non-blocking)
+- `build_layout()` accepts and renders `systems_data` parameter
+
+### `SYSTEM_LOGIC.md` — New File
+Complete reference document for the TraderBJones system logic framework.
+- Three primary systems: SPX [10/50/200], NASDAQ [20/100/250], DJI [30/60/90/300/600/900]
+- Heightened volatility rules: MA cross → candle close vs key MA during rising VIX
+- VIX confirmation framework [26/52/116/211/422/844] with 1m/10m/1H timeframe roles
+- SVIX daily cluster at ~20 as structural support indicator
+- Major level confluence: SPX MA200 + NASDAQ MA250 + DJI MA900
+- Crash condition: only when SPX system negative (MA10 < MA50)
+- Broader market extensions: IWM/IWV 2H [16/31/63/125/250/500]
+- Fill-the-bucket dynamic: cross-system capital rotation
+
+### `signal_tracker_v2.py` — New File
+Standalone forward return tracker. Read-only from existing output. Writes only to `output/signal_tracking/`.
+- Ingests top-N signals from latest v3 xlsx (grade, score, entry price) + high-confidence trades
+- Logs first detection only per ticker/timeframe/outfit — never overwrites
+- Fills forward closing prices at **+1d / +3d / +5d / +10d / +20d** trading days via yfinance
+- Once a window is filled it is frozen — never re-fetched
+- Prunes signals older than N days (default 60)
+- Terminal report: per-signal forward returns with win rate and average by window
+- Usage: `python3 signal_tracker_v2.py [--top N] [--report] [--csv] [--prune N]`
+- Log: `output/signal_tracking/signal_log.json`
+
+### `muted_tickers.txt` — Updated
+- Added CZR (flat, no setup — 2026-06-10)
+
+### `custom_tickers.txt` — Updated
+- Added UUUU (uranium miner)
+
+---
+
 ## 2026-06-09 — Market Overlay, Zero Gamma, The System, Live Dashboard
 
 All new code lives in `market_overlay/`. Zero changes to original engine files.

@@ -2,8 +2,7 @@
 sheets_sync.py — Writes all engine output categories to Google Sheets.
 =====================================================================
 Tabs written:
-  Current       — main engine snapshot (handled by original sheets_writer.py)
-  Log           — main engine cycle log (handled by original sheets_writer.py)
+  Current       — main engine snapshot (read from signals_current.xlsx)
   Discovery     — latest discovery engine output
   Confluence    — latest confluence engine output
   Backtest      — latest backtest results
@@ -117,6 +116,24 @@ def _latest_root_csv(prefix: str) -> Path | None:
 
 
 # ── Tab builders ──────────────────────────────────────────────────────────────
+
+def build_current_rows() -> list[list]:
+    """Read signals_current.xlsx and return all rows for the Current tab."""
+    xlsx_path = OUTPUT_DIR / "signals_current.xlsx"
+    if not xlsx_path.exists():
+        return [["No signals_current.xlsx found"]]
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(xlsx_path, read_only=True, data_only=True)
+        ws = wb.active
+        rows = []
+        for row in ws.iter_rows(values_only=True):
+            rows.append([("" if v is None else v) for v in row])
+        wb.close()
+        return rows
+    except Exception as e:
+        return [["Error reading signals_current.xlsx"], [str(e)]]
+
 
 def build_discovery_rows() -> list[list]:
     path = _latest_csv("discovery")
@@ -305,7 +322,7 @@ def build_overlay_rows(sys_data: dict = None, gex_data: dict = None) -> list[lis
 
 # ── Main sync ─────────────────────────────────────────────────────────────────
 
-TABS = ["Discovery", "Confluence", "Backtest", "Trades",
+TABS = ["Current", "Discovery", "Confluence", "Backtest", "Trades",
         "Normalized", "V3", "Triangulation", "Overlay"]
 
 
@@ -322,6 +339,7 @@ def sync_all(sys_data: dict = None, gex_data: dict = None):
     _ensure_tabs(svc, TABS)
 
     tab_data = {
+        "Current":       build_current_rows,
         "Discovery":     build_discovery_rows,
         "Confluence":    build_confluence_rows,
         "Backtest":      build_backtest_rows,

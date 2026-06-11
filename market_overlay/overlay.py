@@ -43,6 +43,7 @@ import gamma_engine
 import flashalpha_gex
 import index_gex
 import sheets_sync
+import systems_panel
 
 # Triangulation readers — import from _triangulation_staging (read-only)
 _tri_path = os.path.join(os.path.dirname(__file__), "..", "_triangulation_staging")
@@ -260,18 +261,26 @@ def build_gamma_panel(data):
 # Index GEX panel (QQQ / IWM / DIA)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_index_gex_panel(idx_gex: dict):
+def build_index_gex_panel(idx_gex: dict, live_prices: dict = None):
     t = Text()
     tickers = ["QQQ", "IWM", "DIA"]
     labels  = {"QQQ": "QQQ Nasdaq", "IWM": "IWM Russell", "DIA": "DIA Dow"}
     any_data = False
+    live_prices = live_prices or {}
 
     for ticker in tickers:
         r = idx_gex.get(ticker, {})
         if not r or r.get("error"):
-            err = r.get("error", "loading...") if r else "loading..."
-            t.append(f"{labels[ticker]:<14}", style="dim")
-            t.append(f"  [dim]{err}[/dim]\n")
+            lp = live_prices.get(ticker)
+            if lp:
+                # Show live price from systems panel even if GEX calc failed
+                t.append(f"{labels[ticker]:<14}", style="bold")
+                t.append(f"  Spot: {lp:,.2f}", style="dim")
+                t.append("  (GEX unavailable)\n", style="dim yellow")
+            else:
+                err = r.get("error", "loading...") if r else "loading..."
+                t.append(f"{labels[ticker]:<14}", style="dim")
+                t.append(f"  [dim]{err}[/dim]\n")
             continue
 
         any_data = True
@@ -297,7 +306,17 @@ def build_index_gex_panel(idx_gex: dict):
         subtitle = "[dim]yfinance · computing first run (~2 min)[/dim]"
     else:
         ts = next((v.get("timestamp","") for v in idx_gex.values() if v.get("timestamp")), "")
-        subtitle = f"[dim]yfinance · {ts}[/dim]"
+        # Show age warning if data is stale (daily cache)
+        age_note = ""
+        try:
+            ts_clean = ts.replace(" UTC", "").strip()
+            ts_dt    = datetime.fromisoformat(ts_clean).replace(tzinfo=timezone.utc)
+            age_min  = (datetime.now(timezone.utc) - ts_dt).total_seconds() / 60
+            if age_min > 60:
+                age_note = f" [yellow]⚠ {int(age_min//60)}h{int(age_min%60)}m old[/yellow]"
+        except Exception:
+            pass
+        subtitle = f"[dim]yfinance · daily cache · {ts}[/dim]{age_note}"
 
     return Panel(t, title="[bold]γ  INDEX ZERO GAMMA[/bold]",
                  border_style="cyan", subtitle=subtitle)
@@ -328,6 +347,12 @@ def build_synthesis_panel(sys_data, gex_data):
     else:
         align, ac = "CAUTION — CONFLICT", "yellow"
         note      = "System DOWN but above zero gamma — possible short squeeze"
+
+    # Override note when EXIT fires — the structural note contradicts the action
+    if "EXIT SHORT" in sig:
+        note = "Price crossed above SMA50 — exit SPXU, stand aside. Await SMA10/50 bullish cross for UPRO entry."
+    elif "EXIT LONG" in sig:
+        note = "Price crossed below SMA50 — exit UPRO, stand aside. Await SMA10/50 bearish cross for SPXU entry."
 
     if "ENTER LONG"  in sig and system_up and above_zero:
         action, ac2 = "✅ HIGH CONVICTION LONG — all aligned",  "bright_green"
@@ -515,7 +540,7 @@ def build_narrative(sys_data, gex_data, signals=None, idx_gex=None) -> Panel:
             parts.append(f"[yellow]⚠ NASDAQ divergence[/yellow]: QQQ is [{ndx_col}]{ndx_state}[/{ndx_col}] while SPY is {state} — watch closely, NASDAQ leads.")
         else:
             dir_word = "higher" if gap > 0 else "lower"
-            parts.append(f"NASDAQ is confirming: QQQ [{ndx_col}]{ndx_state}[/{ndx_col}], trading {dir_word} by {abs(gap):.2f}% today.")
+            parts.append(f"NASDAQ is confirming: QQQ [{ndx_col}]{ndx_state}[/{ndx_col}] (MA structure), trading {dir_word} by {abs(gap):.2f}% today.")
 
     # ── Top signal ────────────────────────────────────────────────────────────
     if signals:
@@ -771,7 +796,7 @@ h1{{font-size:18px;font-weight:700;margin-bottom:2px}}
 # Full layout
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_layout(sys_data, gex_data, signals, macro, stock_gex=None, idx_gex=None):
+def build_layout(sys_data, gex_data, signals, macro, stock_gex=None, idx_gex=None, systems_data=None):
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     # Header
@@ -787,6 +812,7 @@ def build_layout(sys_data, gex_data, signals, macro, stock_gex=None, idx_gex=Non
         Layout(name="top",       ratio=5),
         Layout(name="synthesis", size=6),
         Layout(name="narrative", size=5),
+        Layout(name="systems",   size=20),
         Layout(name="bottom",    ratio=4),
     )
 
@@ -806,9 +832,22 @@ def build_layout(sys_data, gex_data, signals, macro, stock_gex=None, idx_gex=Non
     layout["header"].update(header_panel)
     layout["system"].update(build_system_panel(sys_data))
     layout["gamma"].update(build_gamma_panel(gex_data))
-    layout["idx_gamma"].update(build_index_gex_panel(idx_gex or {}))
+    # Extract live proxy prices from systems_data for index_gex panel
+    _live_px = {}
+    if systems_data:
+        _ixic = systems_data.get("ixic", {})
+        if _ixic.get("close"):
+            _live_px["QQQ"] = _ixic["close"]
+        _iwm = systems_data.get("iwm", {})
+        if _iwm.get("close"):
+            _live_px["IWM"] = _iwm["close"]
+        _dji = systems_data.get("dji_15m", {})
+        if _dji.get("close"):
+            _live_px["DIA"] = _dji["close"]
+    layout["idx_gamma"].update(build_index_gex_panel(idx_gex or {}, live_prices=_live_px))
     layout["synthesis"].update(build_synthesis_panel(sys_data, gex_data))
     layout["narrative"].update(build_narrative(sys_data, gex_data, signals, idx_gex))
+    layout["systems"].update(systems_panel.build_systems_panel(systems_data))
     layout["macro"].update(build_macro_panel(macro))
     layout["signals"].update(build_tri_signals_panel(signals, TRI_TOP_N, stock_gex))
 
@@ -880,10 +919,17 @@ def fetch_all():
     except Exception:
         pass
 
+    # All index systems (cached 5 min, safe to call every cycle)
+    all_systems = {}
+    try:
+        all_systems = systems_panel.fetch_all_systems()
+    except Exception:
+        all_systems = {}
+
     # Write JSON snapshot for live artifact dashboard
     write_snapshot(sys_data, gex_data, signals, macro, idx_gex)
 
-    return sys_data, gex_data, signals, macro, stock_gex, idx_gex
+    return sys_data, gex_data, signals, macro, stock_gex, idx_gex, all_systems
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -898,10 +944,10 @@ def main():
 
     sys_data = {"error": "Loading..."}
     gex_data = {"error": "Loading..."}
-    signals, macro, stock_gex, idx_gex = None, None, {}, {}
+    signals, macro, stock_gex, idx_gex, all_systems = None, None, {}, {}, {}
     last_fetch = 0
 
-    with Live(build_layout(sys_data, gex_data, signals, macro, stock_gex, idx_gex),
+    with Live(build_layout(sys_data, gex_data, signals, macro, stock_gex, idx_gex, all_systems),
               refresh_per_second=1,
               console=console,
               screen=True) as live:
@@ -909,9 +955,9 @@ def main():
             while True:
                 now = time.time()
                 if now - last_fetch >= REFRESH_SECONDS:
-                    sys_data, gex_data, signals, macro, stock_gex, idx_gex = fetch_all()
+                    sys_data, gex_data, signals, macro, stock_gex, idx_gex, all_systems = fetch_all()
                     last_fetch = now
-                live.update(build_layout(sys_data, gex_data, signals, macro, stock_gex, idx_gex))
+                live.update(build_layout(sys_data, gex_data, signals, macro, stock_gex, idx_gex, all_systems))
                 time.sleep(1)
         except KeyboardInterrupt:
             pass

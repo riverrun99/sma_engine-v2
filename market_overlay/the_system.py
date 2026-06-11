@@ -105,6 +105,11 @@ def fetch_nasdaq() -> dict:
                 df.columns = df.columns.droplevel(1)
             df = df.reset_index()
             df.columns = [c.lower() for c in df.columns]
+            # Normalize timestamp column name (yfinance uses 'datetime' or 'date')
+            for _col in ("datetime", "date", "index"):
+                if _col in df.columns:
+                    df = df.rename(columns={_col: "timestamp"})
+                    break
 
         if df is None or df.empty:
             return {"error": "No QQQ data"}
@@ -115,14 +120,24 @@ def fetch_nasdaq() -> dict:
             return {"error": "Not enough QQQ bars"}
 
         last  = df.iloc[-1]
-        first_today = df[df["timestamp"].astype(str).str[:10] == str(last["timestamp"])[:10]].iloc[0] if "timestamp" in df.columns else last
-
         close   = float(last["close"])
-        open_   = float(first_today["close"]) if "timestamp" in df.columns else close
         sma10   = float(last["sma10"])
         sma50   = float(last["sma50"])
         state   = "UP" if sma10 > sma50 else "DOWN"
-        gap_pct = (close - open_) / open_ * 100
+
+        # Day % = change vs yesterday's official close (last bar before today).
+        # Using yesterday's last bar avoids the pre-market reference bug where
+        # Webull's first bar of today can be a 4 AM pre-market bar at a different
+        # level than the official prior close.
+        gap_pct = 0.0
+        open_   = close
+        if "timestamp" in df.columns:
+            today_str = str(last["timestamp"])[:10]
+            prev_bars = df[df["timestamp"].astype(str).str[:10] < today_str]
+            if not prev_bars.empty:
+                prev_close = float(prev_bars.iloc[-1]["close"])
+                gap_pct = (close - prev_close) / prev_close * 100
+                open_   = prev_close
 
         dist_sma50 = (close - sma50) / sma50 * 100
         sma50_slope = _slope(df["sma50"])

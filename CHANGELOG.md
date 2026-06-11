@@ -1,5 +1,44 @@
 # Changelog
 
+## [Unreleased] — 2026-06-11
+
+### Added
+
+#### `market_overlay/systems_panel.py` (new file)
+Full multi-system index state panel for the overlay terminal UI.
+- **SPX 30m [10/50/200]** — POSITIVE when MA10 > MA50. Proxy: SPY. Tracks spread %, MA200 structural level, vehicle (UPRO/SPXU).
+- **IXIC 20m [20/100/250]** — POSITIVE when MA20 > MA100. Proxy: QQQ. Cascading data source: Webull M20 → Webull M30 → yfinance ^IXIC 30m → yfinance QQQ 30m. Source displayed in TF column (·yf in yellow when falling back to yfinance — signals possible MA value mismatch).
+- **DJI 15m [90/300]** — Active ops timeframe. Proxy: DIA.
+- **DJI 1H [90/300/900]** — Structural confirmation timeframe. Proxy: DIA.
+- **IWM 2H [16/250/500]** — Russell 2000 broad market. Webull native 2H; yfinance 1H → resample fallback.
+- **IWV 2H [16/250/500]** — Russell 3000 confirmation. Same fetch path as IWM.
+- **SOX 30m [16/256/512]** — Semiconductor regime. Proxy: SMH.
+- **VIX 1H [26/422]** — HIGH-VOL regime detection. MA26 > MA422 = regime active. Current price from CBOE direct API (see below). History from yfinance for MA calculation.
+- **SVIX 1D [116/211/422]** — Structural vol support. Cluster avg of three MAs (~20); HOLDING/LOST shown.
+- Under HIGH-VOL regime, state column appends `/MAxx` (the active close-rule MA) in yellow for each system.
+- Alignment summary footer: ALL POSITIVE / ALL NEGATIVE / mixed count with plain-English institutional read.
+- 60-second cache per instrument; VIX failures not cached (retry every cycle).
+
+### Fixed
+
+#### `market_overlay/systems_panel.py`
+- **VIX now always shows current price** — replaced yfinance-only VIX fetch with two-stage approach:
+  1. CBOE direct API (`https://cdn.cboe.com/api/global/delayed_quotes/quotes/_VIX.json`) for current price — 15-min delayed, no key, always reliable.
+  2. yfinance `^VIX` 1H history retained for MA26/MA422 calculation.
+  - If yfinance history fails, row shows CBOE price with `● loading` (MAs pending) instead of `⚠ no data`.
+  - If both fail, row shows `⚠ no data` and retries next cycle (not cached).
+- **`_sep()` column count** — fixed from 7 to 8 empty strings to match table column count.
+- **VIX state cell width** — `regime_short = "HIGH-VOL"` (8 chars) used in table cell instead of full `"HIGH-VOL ACTIVE"` (15 chars) which overflowed the State column (width=14).
+
+#### `market_overlay/overlay.py`
+- **Synthesis/Action conflict on EXIT SHORT** — when signal is EXIT SHORT or EXIT LONG, the synthesis note now correctly overrides the generic alignment note: "Price crossed above SMA50 — exit SPXU, stand aside. Await SMA10/50 bullish cross for UPRO entry."
+- **Market Read NASDAQ language** — removed "as of close" phrasing during market hours; now reads "NASDAQ is confirming: QQQ [state] (MA structure), trading [direction] by X% today."
+- **Zero Gamma panel staleness** — `build_index_gex_panel()` now accepts `live_prices` dict; subtitle shows "daily cache · HH:MM UTC" with `⚠ Xh Ym old` warning when cache is >60 min stale.
+- **IWM/DIA spot price in Zero Gamma panel** — when GEX computation fails/unavailable, live spot price from systems panel is now displayed ("Spot: 287.75  (GEX unavailable)") instead of nothing. Uses `Text.append(..., style=...)` correctly (not inline Rich markup which renders as literal text).
+- **`build_layout()` live price extraction** — extracts QQQ/IWM/DIA close prices from systems data and passes them to `build_index_gex_panel()` each cycle.
+
+---
+
 ## [Unreleased] — 2026-06-09
 
 ### Added — `market_overlay/` (new folder, zero changes to original engine)

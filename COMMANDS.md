@@ -26,6 +26,9 @@ cd ~/Developer/sma_engine/market_overlay && python3 gamma_engine.py
 
 # Check index GEX (QQQ/IWM/DIA)
 cd ~/Developer/sma_engine/market_overlay && python3 index_gex.py
+
+# Check all index systems state (SPX/IXIC/DJI/IWM/IWV/SOX/VIX/SVIX) standalone
+cd ~/Developer/sma_engine/market_overlay && python3 systems_panel.py
 ```
 
 ---
@@ -141,6 +144,30 @@ docker exec e47_engine python /app/trade_engine.py --min-rr 1.0
 
 ---
 
+## Signal Forward Return Tracker
+
+```bash
+# Update log + print report (run after any engine cycle)
+cd ~/Developer/sma_engine && python3 signal_tracker_v2.py
+
+# Track top 50 signals only
+cd ~/Developer/sma_engine && python3 signal_tracker_v2.py --top 50
+
+# Print report only — no price fetch, no log update
+cd ~/Developer/sma_engine && python3 signal_tracker_v2.py --report
+
+# Update + save CSV report to output/signal_tracking/
+cd ~/Developer/sma_engine && python3 signal_tracker_v2.py --csv
+
+# Drop signals older than 30 days (default 60)
+cd ~/Developer/sma_engine && python3 signal_tracker_v2.py --prune 30
+```
+
+Log: `output/signal_tracking/signal_log.json`
+Reports: `output/signal_tracking/performance_YYYY-MM-DD.csv`
+
+---
+
 ## Full Pipeline (run in order)
 
 ```bash
@@ -198,5 +225,7 @@ ls -lt ~/Developer/sma_engine/output/trades/ | head -5
 | `output/backtest_*.csv` | Backtest results |
 | `output/confluence/` | Confluence engine runs |
 | `output/trades/` | Trade engine suggestions |
+| `output/v3/` | V3 engine output (grade/score/entry per signal) |
+| `output/signal_tracking/` | Forward return tracker log + CSV reports |
 | `output/charts/` | Chart screenshots |
 | `output/discovery_charts/` | Discovery chart screenshots |

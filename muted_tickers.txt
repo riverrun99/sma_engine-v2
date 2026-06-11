@@ -850,3 +850,5 @@ KO
 TJX
 MKC
 ATAI
+# --- Muted 2026-06-10 ---
+CZR    # flat, no setup
