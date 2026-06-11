@@ -76,3 +76,7 @@ credentials/
 market_overlay/dashboard.html
 market_overlay/latest_snapshot.json
 market_overlay/.gex_cache.json
+market_overlay/webull_data_sdk.log*
+
+# Excel snapshots / archives
+*.xlsx
