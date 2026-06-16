@@ -1,8 +1,10 @@
 """
 coordinator.py — Stagger the three SMA engines: main → normalized → v3
+                 Then run discovery and confluence after each full cycle.
 
 Watches the main engine output for a new cycle, then signals each subsequent
 engine to run immediately (via SIGUSR1) rather than waiting for its own timer.
+After V3 completes, runs discovery then confluence inside the main container.
 
 Run from the sma_engine directory:
     python3 coordinator.py
@@ -37,7 +39,8 @@ V3_GLOB     = os.path.join(BASE, "output", "v3", "v3_*.xlsx")
 NORM_CONTAINER = "e47_engine_normalized"
 V3_CONTAINER   = "e47_engine_v3"
 
-POLL_INTERVAL = 10  # seconds between checks
+MAIN_CONTAINER = "e47_engine"
+POLL_INTERVAL  = 10  # seconds between checks
 
 
 def latest_mtime(pattern: str) -> float:
@@ -50,6 +53,22 @@ def file_mtime(path: str) -> float:
         return os.path.getmtime(path)
     except FileNotFoundError:
         return 0.0
+
+
+def run_in_container(container: str, cmd: list[str], label: str) -> None:
+    """Run a command inside a container via docker exec."""
+    try:
+        logging.info(f"Running {label} in {container}...")
+        result = subprocess.run(
+            ["docker", "exec", container] + cmd,
+            capture_output=True, text=True
+        )
+        if result.returncode == 0:
+            logging.info(f"{label} complete")
+        else:
+            logging.warning(f"{label} exited with code {result.returncode}: {result.stderr.strip()[:200]}")
+    except Exception as e:
+        logging.error(f"{label} failed: {e}")
 
 
 def signal_container(name: str) -> None:
@@ -109,12 +128,23 @@ def main() -> None:
                 signal_container(V3_CONTAINER)
                 triggered_v3 = True
 
-        # ── Check V3 output (just for logging) ────────────────────────────────
+        # ── Check V3 output — then run discovery + confluence ─────────────────
         if triggered_v3:
             current_v3 = latest_mtime(V3_GLOB)
             if current_v3 > last_v3_mtime:
-                logging.info(f"V3 output updated — full chain complete. Waiting for next main cycle.")
+                logging.info(f"V3 output updated — full chain complete. Running discovery + confluence...")
                 last_v3_mtime = current_v3
+                run_in_container(
+                    MAIN_CONTAINER,
+                    ["python3", "/app/discovery_engine.py", "--timeframes", "1d,1w,1mo"],
+                    "DISCOVERY"
+                )
+                run_in_container(
+                    MAIN_CONTAINER,
+                    ["python3", "/app/confluence_engine.py", "--min-score", "2", "--discovery-tf", "1d,1w,1mo"],
+                    "CONFLUENCE"
+                )
+                logging.info("Cycle complete. Waiting for next main cycle.")
                 triggered_norm = False
                 triggered_v3   = False
 
