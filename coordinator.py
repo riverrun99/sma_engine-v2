@@ -144,7 +144,8 @@ def main() -> None:
                     ["python3", "/app/confluence_engine.py", "--min-score", "2", "--discovery-tf", "1d,1w,1mo"],
                     "CONFLUENCE"
                 )
-                logging.info("Cycle complete. Waiting for next main cycle.")
+                logging.info("Cycle complete — signalling main engine to start next cycle.")
+                signal_container(MAIN_CONTAINER)
                 triggered_norm = False
                 triggered_v3   = False
 

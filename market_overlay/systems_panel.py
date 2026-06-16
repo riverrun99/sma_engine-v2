@@ -184,13 +184,18 @@ def _system_spx() -> dict:
              "state": None, "error": "insufficient bars",
              "vehicle_pos": "UPRO", "vehicle_neg": "SPXU"}
         _set_cache(key, r); return r
+    state_normal   = "POSITIVE" if ma10 > ma50  else "NEGATIVE"
+    state_high_vol = "POSITIVE" if close > ma50 else "NEGATIVE"
     r = {
         "label": "SPX", "tf": "30m", "outfit": "10/50/200",
         "proxy": "SPY",
         "pos_ma": "MA10", "neg_ma": "MA50",
         "major": "MA200", "major_val": ma200,
         "ma_a": ma10, "ma_b": ma50, "close": close,
-        "state": "POSITIVE" if ma10 > ma50 else "NEGATIVE",
+        "state": state_normal,
+        "state_normal": state_normal,
+        "state_high_vol": state_high_vol,
+        "close_key_ma": ma50, "close_key_ma_name": "MA50",
         "spread_pct": (ma10 - ma50) / ma50 * 100,
         "vehicle_pos": "UPRO", "vehicle_neg": "SPXU",
     }
@@ -236,9 +241,10 @@ def _system_ixic() -> dict:
              "state": None, "error": "insufficient bars",
              "vehicle_pos": "TQQQ", "vehicle_neg": "SQQQ"}
         _set_cache(key, r); return r
-    state = "POSITIVE" if ma20 > ma100 else "NEGATIVE"
+    state_normal   = "POSITIVE" if ma20 > ma100  else "NEGATIVE"
+    state_high_vol = "POSITIVE" if close > ma100 else "NEGATIVE"
     # 20m when POSITIVE and Webull 20m available; 30m during NEGATIVE (close-rule active)
-    tf_label = "20m" if (using_20m and state == "POSITIVE") else "30m"
+    tf_label = "20m" if (using_20m and state_normal == "POSITIVE") else "30m"
     r = {
         "label": "IXIC", "tf": tf_label, "outfit": "20/100/250",
         "source": source,                        # WB-20m / WB-30m / yf-30m
@@ -246,7 +252,10 @@ def _system_ixic() -> dict:
         "pos_ma": "MA20", "neg_ma": "MA100",
         "major": "MA250", "major_val": ma250,
         "ma_a": ma20, "ma_b": ma100, "close": close,
-        "state": state,
+        "state": state_normal,
+        "state_normal": state_normal,
+        "state_high_vol": state_high_vol,
+        "close_key_ma": ma100, "close_key_ma_name": "MA100",
         "spread_pct": (ma20 - ma100) / ma100 * 100,
         "vehicle_pos": "TQQQ", "vehicle_neg": "SQQQ",
     }
@@ -273,12 +282,17 @@ def _system_dji_15m() -> dict:
              "state": None, "error": "insufficient bars",
              "vehicle_pos": "UDOW", "vehicle_neg": "SDOW"}
         _set_cache(key, r); return r
+    state_normal   = "POSITIVE" if ma90 > ma300  else "NEGATIVE"
+    state_high_vol = "POSITIVE" if close > ma300 else "NEGATIVE"
     r = {
         "label": "DJI", "tf": "15m", "outfit": "90/300",
         "proxy": "DIA",
         "pos_ma": "MA90", "neg_ma": "MA300",
         "ma_a": ma90, "ma_b": ma300, "close": close,
-        "state": "POSITIVE" if ma90 > ma300 else "NEGATIVE",
+        "state": state_normal,
+        "state_normal": state_normal,
+        "state_high_vol": state_high_vol,
+        "close_key_ma": ma300, "close_key_ma_name": "MA300",
         "spread_pct": (ma90 - ma300) / ma300 * 100,
         "vehicle_pos": "UDOW", "vehicle_neg": "SDOW",
     }
@@ -306,13 +320,18 @@ def _system_dji_1h() -> dict:
              "state": None, "error": "insufficient bars",
              "vehicle_pos": "UDOW", "vehicle_neg": "SDOW"}
         _set_cache(key, r); return r
+    state_normal   = "POSITIVE" if ma90 > ma300  else "NEGATIVE"
+    state_high_vol = "POSITIVE" if close > ma300 else "NEGATIVE"
     r = {
         "label": "DJI", "tf": "1H", "outfit": "90/300/900",
         "proxy": "DIA",
         "pos_ma": "MA90", "neg_ma": "MA300",
         "major": "MA900", "major_val": ma900,
         "ma_a": ma90, "ma_b": ma300, "close": close,
-        "state": "POSITIVE" if ma90 > ma300 else "NEGATIVE",
+        "state": state_normal,
+        "state_normal": state_normal,
+        "state_high_vol": state_high_vol,
+        "close_key_ma": ma300, "close_key_ma_name": "MA300",
         "spread_pct": (ma90 - ma300) / ma300 * 100,
         "vehicle_pos": "UDOW", "vehicle_neg": "SDOW",
     }
@@ -393,16 +412,16 @@ def _system_iwv() -> dict:
 
 
 def _system_sox() -> dict:
-    """SOX 15m [16/256/512]  POSITIVE = MA16 > MA256. Proxy: SMH (ETF)."""
+    """SMH 15m [16/256/512]  POSITIVE = MA16 > MA256. Uses SMH (VanEck Semiconductor ETF)."""
     key = "sox_15m"
     if (hit := _check_cache(key)):
         return hit
     # SMH (VanEck Semiconductor ETF) is in engine's ETF_SYMBOLS → clean Webull fetch
-    df = _fetch("SMH", "^SOX", "15m", 530)
+    df = _fetch("SMH", "SMH", "15m", 530)
     if df.empty:
-        r = {"label": "SOX", "tf": "15m", "outfit": "16/256/512",
+        r = {"label": "SMH", "tf": "15m", "outfit": "16/256/512",
              "state": None, "error": "no data",
-             "vehicle_pos": "SOXL", "vehicle_neg": "SOXS"}
+             "vehicle_pos": "SOXL", "vehicle_neg": "SSG"}
         _set_cache(key, r); return r
     c = df["close"]
     ma16  = _last(_sma(c, 16))
@@ -410,19 +429,19 @@ def _system_sox() -> dict:
     ma512 = _last(_sma(c, 512))
     close = float(c.iloc[-1])
     if ma16 is None or ma256 is None:
-        r = {"label": "SOX", "tf": "15m", "outfit": "16/256/512",
+        r = {"label": "SMH", "tf": "15m", "outfit": "16/256/512",
              "state": None, "error": "insufficient bars",
-             "vehicle_pos": "SOXL", "vehicle_neg": "SOXS"}
+             "vehicle_pos": "SOXL", "vehicle_neg": "SSG"}
         _set_cache(key, r); return r
     r = {
-        "label": "SOX", "tf": "15m", "outfit": "16/256/512",
+        "label": "SMH", "tf": "15m", "outfit": "16/256/512",
         "proxy": "SMH",
         "pos_ma": "MA16", "neg_ma": "MA256",
         "major": "MA512", "major_val": ma512,
         "ma_a": ma16, "ma_b": ma256, "close": close,
         "state": "POSITIVE" if ma16 > ma256 else "NEGATIVE",
         "spread_pct": (ma16 - ma256) / ma256 * 100,
-        "vehicle_pos": "SOXL", "vehicle_neg": "SOXS",
+        "vehicle_pos": "SOXL", "vehicle_neg": "SSG",
     }
     _set_cache(key, r); return r
 
@@ -659,7 +678,15 @@ def build_systems_panel(systems: dict = None) -> Panel:
                         Text(err, style="dim"), "—")
             return
 
-        state   = s["state"]
+        # Pick state based on VIX regime:
+        # HIGH-VOL → candle close vs key MA (MA50/MA100/MA300)
+        # NORMAL   → MA cross (MA10>MA50, MA20>MA100, MA90>MA300)
+        has_hv = "state_high_vol" in s
+        if high_vol and has_hv:
+            state = s["state_high_vol"]
+        else:
+            state = s.get("state_normal") or s["state"]
+
         close   = s.get("close")
         proxy   = s.get("proxy", "")
         ma_a    = s.get("ma_a")
@@ -677,16 +704,16 @@ def build_systems_panel(systems: dict = None) -> Panel:
         ma_b_str  = f"{ma_b:,.1f}"  if ma_b  else "—"
 
         col    = "green" if state == "POSITIVE" else "red"
-        symbol = "●"
 
-        # Under high-vol, flag which MA becomes the active close-rule level
-        if high_vol:
+        # Under high-vol (for systems that support it), show close-rule indicator
+        if high_vol and has_hv:
+            close_ma_name = s.get("close_key_ma_name", neg_ma)
             state_text = Text()
-            state_text.append(f"{symbol} ", style=col)
-            state_text.append(state[:3], style=f"bold {col}")
-            state_text.append(f" /{neg_ma}", style="dim yellow")
+            state_text.append("⚠ ", style="yellow")
+            state_text.append(state, style=f"bold {col}")
+            state_text.append(f" >{close_ma_name}", style="dim yellow")
         else:
-            state_text = Text(f"{symbol} {state}", style=f"bold {col}")
+            state_text = Text(f"● {state}", style=f"bold {col}")
 
         spread_str = f"{spread:+.2f}%" if spread is not None else "—"
         spread_col = "green" if (spread or 0) > 0 else "red"

@@ -40,6 +40,7 @@ from stream_client import WebullStreamClient
 
 
 SHUTDOWN = False
+RUN_NOW  = False   # set True by SIGUSR1 to skip current sleep
 
 # Paths to the hot-reload filter files (mounted read-only from host at /app/)
 MUTED_TICKERS_PATH  = "/app/muted_tickers.txt"
@@ -147,6 +148,12 @@ def handle_signal(signum, frame):
     global SHUTDOWN
     logging.info(f"Received signal {signum}, shutting down after current cycle...")
     SHUTDOWN = True
+
+
+def handle_sigusr1(signum, frame):
+    global RUN_NOW
+    logging.info("Received SIGUSR1 — skipping sleep, running next cycle immediately")
+    RUN_NOW = True
 
 
 def make_client(source: str):
@@ -336,6 +343,7 @@ def main():
 
     signal.signal(signal.SIGTERM, handle_signal)
     signal.signal(signal.SIGINT, handle_signal)
+    signal.signal(signal.SIGUSR1, handle_sigusr1)
 
     source = os.environ.get("ENGINE_SOURCE", "mock")
     universe_tier = os.environ.get("ENGINE_UNIVERSE", "tier1")
@@ -447,11 +455,12 @@ def main():
             logging.info(f"Cycle {cycle_count} done in {elapsed:.1f}s, "
                          f"sleeping {sleep_for:.0f}s")
 
-            # Sleep in 1s chunks so SIGTERM is responsive
+            # Sleep in 1s chunks so SIGTERM/SIGUSR1 are caught quickly
             slept = 0.0
-            while slept < sleep_for and not SHUTDOWN:
+            while slept < sleep_for and not SHUTDOWN and not RUN_NOW:
                 time.sleep(min(1.0, sleep_for - slept))
                 slept += 1.0
+            RUN_NOW = False
     finally:
         if stream_client is not None:
             stream_client.stop()
