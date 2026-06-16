@@ -1,5 +1,51 @@
 # SMA Engine — Command Reference
 
+## Starting Everything
+
+```bash
+# Full sequential cold-start: V3 → Main → Normalized → Coordinator (recommended)
+cd ~/Developer/sma_engine && ./start_engines.sh
+
+# Check status of all engines, outputs, and coordinator at a glance
+cd ~/Developer/sma_engine && ./status.sh
+
+# Live coordinator log (shows when each engine is triggered)
+tail -f ~/Developer/sma_engine/logs/coordinator.log
+```
+
+---
+
+## Engine Logs (live)
+
+```bash
+docker logs e47_engine -f
+docker logs e47_engine_normalized -f
+docker logs e47_engine_v3 -f
+```
+
+---
+
+## Manual Engine Control (if not using start_engines.sh)
+
+```bash
+# Start main engine only
+cd ~/Developer/sma_engine && docker-compose up -d
+
+# Start normalized engine only
+cd ~/Developer/sma_engine && docker-compose -f docker-compose.normalized.yml up -d
+
+# Start V3 engine only
+cd ~/Developer/sma_engine/_v3_staging && docker-compose -f docker-compose.v3.yml up -d
+
+# Stop all engines
+docker stop e47_engine e47_engine_normalized e47_engine_v3
+
+# Start coordinator manually (after all engines have completed cycle 0)
+cd ~/Developer/sma_engine && nohup python3 coordinator.py >> logs/coordinator.log 2>&1 &
+```
+
+---
+
 ## Market Overlay
 
 ```bash

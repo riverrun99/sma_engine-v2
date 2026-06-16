@@ -79,31 +79,39 @@ def save_candle_cache(cache: dict, cache_dir: str = CACHE_DIR) -> None:
         logging.warning(f"Cache save failed (non-fatal): {e}")
 
 
-def load_candle_cache(cache_dir: str = CACHE_DIR) -> dict:
+def load_candle_cache(cache_dir: str = CACHE_DIR, active_tickers: set | None = None) -> dict:
     """
     Load the candle cache from disk at startup.
     Returns empty dict if no cache exists yet (first ever run).
+    If active_tickers is provided, only load cache files for those tickers.
     """
     cache: dict = {}
     if not os.path.exists(cache_dir):
         return cache
     try:
         files = [f for f in os.listdir(cache_dir) if f.endswith(".pkl.gz")]
+        loaded = 0
+        skipped = 0
         for fname in files:
             ticker = fname[:-7]  # strip .pkl.gz
+            if active_tickers is not None and ticker not in active_tickers:
+                skipped += 1
+                continue
             path = os.path.join(cache_dir, fname)
             try:
                 with gzip.open(path, "rb") as f:
                     tf_data: dict = pickle.load(f)
                 for tf, df in tf_data.items():
                     cache[(ticker, tf)] = df
+                loaded += 1
             except Exception as e:
                 logging.warning(f"  cache load failed for {ticker}: {e}")
 
         if cache:
             logging.info(
-                f"  cache loaded: {len(files)} tickers, "
+                f"  cache loaded: {loaded} tickers, "
                 f"{len(cache)} (ticker, tf) pairs from {cache_dir}"
+                + (f" (skipped {skipped} inactive)" if skipped else "")
             )
     except Exception as e:
         logging.warning(f"Cache load failed (non-fatal): {e}")
@@ -401,9 +409,11 @@ def main():
 
     cycle_count = 0
     current_regime_label: Optional[str] = None
-    # Load cache from disk — if a previous run saved it, cycle 1 becomes incremental
+    # Load cache from disk — filtered to active tickers only to save RAM
     logging.info("Loading candle cache from disk...")
-    persistent_cache: dict = load_candle_cache()
+    _startup_custom = set(load_ticker_file(CUSTOM_TICKERS_PATH))
+    _active_tickers = set(cfg.universe) | _startup_custom
+    persistent_cache: dict = load_candle_cache(active_tickers=_active_tickers)
     try:
         while not SHUTDOWN:
             start = time.monotonic()

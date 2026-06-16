@@ -226,17 +226,19 @@ def build_gamma_panel(data):
     t.append(f"  {regime}  ", style=f"bold {rc} on {'dark_green' if 'ABOVE' in regime else 'dark_red'}")
     t.append(f"\n{data['regime_note']}\n\n", style="dim")
 
-    t.append(f"SPY Spot   : {spot:.2f}\n")
-    t.append(f"Zero Gamma : {zero:.2f}\n", style=f"bold {rc}")
     dc = dist_color(dist)
-    t.append("Distance   : ", style="dim")
-    t.append(f"{dist:+.2f}%", style=f"bold {dc}")
-    t.append(f"  ({'above' if dist > 0 else 'below'} zero)\n\n", style="dim")
+    t.append(f"SPX Spot   : {spot:.2f}  ", style="bold")
+    t.append(f"({dist:+.2f}% {'above' if dist > 0 else 'below'} zero)\n", style=f"bold {dc}")
+    t.append(f"Zero Gamma : {zero:.2f}\n", style=f"bold {rc}")
 
-    if data.get("call_wall"):
-        t.append(f"Call Wall  : {data['call_wall']:.2f}\n", style="green")
-    if data.get("put_wall"):
-        t.append(f"Put Wall   : {data['put_wall']:.2f}\n", style="red")
+    if data.get("exp_move_upper") and data.get("exp_move_lower"):
+        t.append(f"Exp Move   : ", style="dim")
+        t.append(f"{data['exp_move_lower']:.0f}", style="red")
+        t.append(" — ", style="dim")
+        t.append(f"{data['exp_move_upper']:.0f}\n", style="green")
+
+    if data.get("vanna_inflection"):
+        t.append(f"Vanna Infl : {data['vanna_inflection']:.2f}\n", style="dim")
 
     if abs(dist) <= 5:
         bw  = 38
@@ -246,7 +248,7 @@ def build_gamma_panel(data):
         bar[mid] = "│"
         bar[pos] = "●"
         t.append(f"\n[{''.join(bar)}]\n", style=rc)
-        t.append("Put wall         Zero         Call wall\n", style="dim")
+        t.append("Lower            Zero            Upper\n", style="dim")
 
     if data.get("stale"):
         t.append(f"\n[yellow]⚠ {data['stale_note']}[/yellow]\n")

@@ -9,7 +9,7 @@ Fetches and displays the current state of all TraderBJones index systems:
   DJI     1H  [90/300/900]     POSITIVE = MA90 > MA300   (structural)
   IWM     2H  [16/250/500]     POSITIVE = MA16 > MA250
   IWV     2H  [16/250/500]     POSITIVE = MA16 > MA250
-  SOX    30m  [16/256/512]     POSITIVE = MA16 > MA256
+  SOX    15m  [16/256/512]     POSITIVE = MA16 > MA256
   VIX     1H  [26/422]         MA26 > MA422  →  HIGH-VOL regime active
   SVIX    1D  [116/211/422]    cluster ~20   →  structural support
 
@@ -393,14 +393,14 @@ def _system_iwv() -> dict:
 
 
 def _system_sox() -> dict:
-    """SOX 30m [16/256/512]  POSITIVE = MA16 > MA256. Proxy: SMH (ETF)."""
-    key = "sox_30m"
+    """SOX 15m [16/256/512]  POSITIVE = MA16 > MA256. Proxy: SMH (ETF)."""
+    key = "sox_15m"
     if (hit := _check_cache(key)):
         return hit
     # SMH (VanEck Semiconductor ETF) is in engine's ETF_SYMBOLS → clean Webull fetch
-    df = _fetch("SMH", "^SOX", "30m", 530)
+    df = _fetch("SMH", "^SOX", "15m", 530)
     if df.empty:
-        r = {"label": "SOX", "tf": "30m", "outfit": "16/256/512",
+        r = {"label": "SOX", "tf": "15m", "outfit": "16/256/512",
              "state": None, "error": "no data",
              "vehicle_pos": "SOXL", "vehicle_neg": "SOXS"}
         _set_cache(key, r); return r
@@ -410,12 +410,12 @@ def _system_sox() -> dict:
     ma512 = _last(_sma(c, 512))
     close = float(c.iloc[-1])
     if ma16 is None or ma256 is None:
-        r = {"label": "SOX", "tf": "30m", "outfit": "16/256/512",
+        r = {"label": "SOX", "tf": "15m", "outfit": "16/256/512",
              "state": None, "error": "insufficient bars",
              "vehicle_pos": "SOXL", "vehicle_neg": "SOXS"}
         _set_cache(key, r); return r
     r = {
-        "label": "SOX", "tf": "30m", "outfit": "16/256/512",
+        "label": "SOX", "tf": "15m", "outfit": "16/256/512",
         "proxy": "SMH",
         "pos_ma": "MA16", "neg_ma": "MA256",
         "major": "MA512", "major_val": ma512,
@@ -457,11 +457,13 @@ def _system_vix() -> dict:
 
     # ── Step 2: Historical bars from yfinance (for MA26 / MA422) ─────────────
     df = pd.DataFrame()
-    for _period in ("1y", "2y", "6mo", "max"):
-        # Attempt 1: yf.download
+    proxy_used = "^VIX"
+
+    def _yf_bars(ticker: str, period: str, interval: str) -> pd.DataFrame:
+        """Try yf.download then Ticker.history for a given ticker."""
         for _adj in (False, True):
             try:
-                raw = yf.download("^VIX", period=_period, interval="1h",
+                raw = yf.download(ticker, period=period, interval=interval,
                                   progress=False, auto_adjust=_adj, threads=False)
                 if raw is not None and not raw.empty:
                     if isinstance(raw.columns, pd.MultiIndex):
@@ -472,16 +474,13 @@ def _system_vix() -> dict:
                         if _c in raw.columns:
                             raw = raw.rename(columns={_c: "timestamp"})
                             break
-                    df = raw[["timestamp", "close"]].dropna()
-                    if not df.empty:
-                        break
+                    out = raw[["timestamp", "close"]].dropna()
+                    if not out.empty:
+                        return out
             except Exception:
                 pass
-        if not df.empty:
-            break
-        # Attempt 2: Ticker.history()
         try:
-            raw = yf.Ticker("^VIX").history(period=_period, interval="1h")
+            raw = yf.Ticker(ticker).history(period=period, interval=interval)
             if raw is not None and not raw.empty:
                 raw = raw.reset_index()
                 raw.columns = [str(c).lower() for c in raw.columns]
@@ -489,20 +488,45 @@ def _system_vix() -> dict:
                     if _c in raw.columns:
                         raw = raw.rename(columns={_c: "timestamp"})
                         break
-                df = raw[["timestamp", "close"]].dropna()
-                if not df.empty:
-                    break
+                out = raw[["timestamp", "close"]].dropna()
+                if not out.empty:
+                    return out
         except Exception:
             pass
+        return pd.DataFrame()
+
+    # Try ^VIX first across multiple periods
+    for _period in ("2y", "1y", "6mo", "max"):
+        df = _yf_bars("^VIX", _period, "1h")
+        if not df.empty:
+            break
+
+    # Fallback: Webull UVXY 1h, then VIXY 1h (ETF proxies — contango decay
+    # means absolute MA levels differ from ^VIX, but crossover direction holds)
+    if df.empty:
+        df = _fetch_wb("UVXY", "1h", 450)
+        if not df.empty:
+            proxy_used = "UVXY"
+    if df.empty:
+        for _period in ("2y", "1y", "max"):
+            df = _yf_bars("UVXY", _period, "1h")
+            if not df.empty:
+                proxy_used = "UVXY"
+                break
+    if df.empty:
+        for _period in ("2y", "1y", "max"):
+            df = _yf_bars("VIXY", _period, "1h")
+            if not df.empty:
+                proxy_used = "VIXY"
+                break
 
     # ── Step 3: Build result ──────────────────────────────────────────────────
+    src_tag = ("CBOE+" if vix_spot is not None else "") + proxy_used
     if df.empty:
         if vix_spot is None:
-            # Total failure — no price, no history; retry next cycle
             r = {"label": "VIX", "tf": "1H", "outfit": "26/422",
                  "high_vol": False, "regime": None, "error": "no data"}
             return r
-        # CBOE price available but no MA history yet
         r = {
             "label": "VIX", "tf": "1H", "outfit": "26/422",
             "vix": vix_spot,
@@ -516,7 +540,6 @@ def _system_vix() -> dict:
         return r
 
     c = df["close"]
-    # Use CBOE spot as current price if available (more current than yfinance bar)
     vix_close = vix_spot if vix_spot is not None else float(c.iloc[-1])
     ma26  = _last(_sma(c, 26))
     ma422 = _last(_sma(c, 422))
@@ -525,7 +548,7 @@ def _system_vix() -> dict:
         r = {"label": "VIX", "tf": "1H", "outfit": "26/422",
              "vix": vix_close, "high_vol": False, "regime": None,
              "error": "insufficient bars for MA26",
-             "source": "CBOE+yf" if vix_spot is not None else "yf"}
+             "source": src_tag}
         _set_cache(key, r); return r
     high_vol = (ma422 is not None) and (ma26 > ma422)
     r = {
@@ -536,7 +559,7 @@ def _system_vix() -> dict:
         "high_vol": high_vol,
         "regime": ("HIGH-VOL ACTIVE" if high_vol else
                    "NORMAL" if ma422 is not None else "loading"),
-        "source": "CBOE+yf" if vix_spot is not None else "yf",
+        "source": src_tag,
     }
     _set_cache(key, r); return r
 

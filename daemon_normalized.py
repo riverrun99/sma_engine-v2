@@ -41,6 +41,7 @@ logging.basicConfig(
 )
 
 SHUTDOWN = False
+RUN_NOW  = False   # set True by SIGUSR1 to skip current sleep
 
 
 def handle_signal(signum, frame):
@@ -49,8 +50,15 @@ def handle_signal(signum, frame):
     SHUTDOWN = True
 
 
+def handle_sigusr1(signum, frame):
+    global RUN_NOW
+    logging.info("Received SIGUSR1 — skipping sleep, running next cycle immediately")
+    RUN_NOW = True
+
+
 signal.signal(signal.SIGTERM, handle_signal)
 signal.signal(signal.SIGINT,  handle_signal)
+signal.signal(signal.SIGUSR1, handle_sigusr1)
 
 
 def run_command(cmd: list[str], label: str) -> bool:
@@ -76,6 +84,7 @@ def run_command(cmd: list[str], label: str) -> bool:
 
 
 def main():
+    global RUN_NOW
     # ── Config from env vars ──────────────────────────────────────────────────
     interval     = int(os.environ.get("NORM_INTERVAL_SECONDS",  "300"))
     top_n        = int(os.environ.get("NORM_TOP_N",             "500"))
@@ -147,11 +156,12 @@ def main():
                 f"  Cycle {cycle} done in {elapsed:.0f}s. "
                 f"Next cycle in {wait:.0f}s (at ~{next_run} UTC)"
             )
-            # Sleep in small chunks so SIGTERM is caught quickly
+            # Sleep in small chunks so SIGTERM/SIGUSR1 are caught quickly
             slept = 0
-            while slept < wait and not SHUTDOWN:
+            while slept < wait and not SHUTDOWN and not RUN_NOW:
                 time.sleep(min(5, wait - slept))
                 slept += 5
+            RUN_NOW = False
         else:
             logging.info(
                 f"  Cycle {cycle} done in {elapsed:.0f}s "

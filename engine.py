@@ -154,6 +154,10 @@ WEBULL_TIMESPAN_MAP: dict[str, str] = {
 # Replace UNIVERSE_TIER_3 with your own list (NYSE/NASDAQ/CBOE) for full 2k coverage.
 
 UNIVERSE_TIER_1: list[str] = [
+    # Cleared 2026-06-14 — populate via custom_tickers.txt
+]
+
+_UNIVERSE_TIER_1_ORIG: list[str] = [
     # ── Market indices (Webull may return these as read-only; engine skips on fail) ─
     "SPX",                      # S&P 500 Index
     "IXIC",                     # NASDAQ Composite
@@ -271,6 +275,10 @@ UNIVERSE_TIER_1: list[str] = [
 ]
 
 UNIVERSE_TIER_2: list[str] = [
+    # Cleared 2026-06-14 — populate via custom_tickers.txt
+]
+
+_UNIVERSE_TIER_2_ORIG: list[str] = [
     # ── Mega caps ────────────────────────────────────────────────────────────
     "AAPL", "MSFT", "NVDA", "GOOGL", "GOOG", "META", "AMZN", "TSLA", "AVGO",
     "AMD", "PLTR", "NFLX", "ORCL", "CRM", "ADBE", "INTC", "QCOM", "MU",
@@ -285,6 +293,10 @@ UNIVERSE_TIER_2: list[str] = [
 ]
 
 UNIVERSE_TIER_3: list[str] = [
+    # Cleared 2026-06-14 — populate via custom_tickers.txt
+]
+
+_UNIVERSE_TIER_3_ORIG: list[str] = [
     # ── T-Rex / GraniteShares single-stock leveraged (less liquid) ────────────
     "NVDX",                  # Nvidia 2x bull (GraniteShares)
     "AAPB",                  # Apple 2x bull
@@ -2031,6 +2043,10 @@ class SMAOutfitEngine:
 
         # ── Parallel scan across tickers (multiprocessing — bypasses the GIL) ──
         n_workers = int(os.environ.get("ENGINE_SCAN_WORKERS", "6"))
+        # ENGINE_SCAN_CONCURRENCY controls how many workers run simultaneously.
+        # Keeping this low prevents RAM spikes while n_workers controls chunk
+        # size (tickers per worker) to stay under the IPC pipe threshold.
+        concurrency = int(os.environ.get("ENGINE_SCAN_CONCURRENCY", str(min(n_workers, 4))))
         tickers = list(self.cfg.universe)
         chunk_size = math.ceil(len(tickers) / n_workers)
         ticker_chunks = [tickers[i:i + chunk_size] for i in range(0, len(tickers), chunk_size)]
@@ -2051,12 +2067,30 @@ class SMAOutfitEngine:
             ))
 
         n_chunks = len(ticker_chunks)
-        logging.info(f"  launching {n_chunks} worker processes (ENGINE_SCAN_WORKERS={n_workers})...")
-        worker_stores: list[HashMapStore] = []
+        logging.info(
+            f"  launching {n_chunks} chunks "
+            f"(ENGINE_SCAN_WORKERS={n_workers}, concurrency={concurrency})..."
+        )
         scan_start = time.monotonic()
-        with multiprocessing.Pool(processes=n_workers, initializer=_scan_worker_init) as pool:
+        with multiprocessing.Pool(processes=concurrency, initializer=_scan_worker_init) as pool:
             for i, result in enumerate(pool.imap_unordered(_scan_worker_fn, worker_args), 1):
-                worker_stores.append(result)
+                # Merge immediately and discard — never accumulate all stores at once.
+                # Previously worker_stores collected all 12 results before merging,
+                # holding up to 6GB simultaneously. Now peak RAM = 1 store at a time.
+                for entry in result.all():
+                    k = entry.key
+                    if k not in self.store._store:
+                        self.store._store[k] = entry
+                    else:
+                        existing = self.store._store[k]
+                        existing.hit_count += entry.hit_count
+                        ts_a = existing.last_hit_ts
+                        ts_b = entry.last_hit_ts
+                        if ts_a is None:
+                            existing.last_hit_ts = ts_b
+                        elif ts_b is not None:
+                            existing.last_hit_ts = ts_a if ts_a > ts_b else ts_b
+                del result  # explicitly release store memory before next result arrives
                 elapsed = time.monotonic() - scan_start
                 pct = i / n_chunks * 100
                 eta = (elapsed / i) * (n_chunks - i) if i < n_chunks else 0
@@ -2065,23 +2099,6 @@ class SMAOutfitEngine:
                     f"({pct:.0f}%) — {elapsed:.0f}s elapsed, "
                     f"~{eta:.0f}s remaining"
                 )
-
-        # Merge all worker stores into main store
-        logging.info(f"  merging {len(worker_stores)} worker stores...")
-        for worker_store in worker_stores:
-            for entry in worker_store.all():
-                k = entry.key
-                if k not in self.store._store:
-                    self.store._store[k] = entry
-                else:
-                    existing = self.store._store[k]
-                    existing.hit_count += entry.hit_count
-                    ts_a = existing.last_hit_ts
-                    ts_b = entry.last_hit_ts
-                    if ts_a is None:
-                        existing.last_hit_ts = ts_b
-                    elif ts_b is not None:
-                        existing.last_hit_ts = ts_a if ts_a > ts_b else ts_b
         logging.info(f"  merge complete: {len(self.store)} total combos")
 
     def monitor_systems(self) -> None:

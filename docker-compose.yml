@@ -73,6 +73,7 @@ services:
     volumes:
       - ./:/app:ro
       - ./output:/cache/output
+      - ./credentials:/credentials:ro
       - engine_cache:/cache
     environment:
       INFLUX_URL: http://influxdb:8086
@@ -92,6 +93,7 @@ services:
       ENGINE_LOOKBACK: ${ENGINE_LOOKBACK:-130}
       ENGINE_REGIME_EVERY: ${ENGINE_REGIME_EVERY:-12}
       ENGINE_SCAN_WORKERS: ${ENGINE_SCAN_WORKERS:-3}
+      ENGINE_SCAN_CONCURRENCY: ${ENGINE_SCAN_CONCURRENCY:-2}
       ENGINE_REFRESH_BARS: ${ENGINE_REFRESH_BARS:-20}
       ENGINE_MIN_TF_MINUTES: ${ENGINE_MIN_TF_MINUTES:-15}
       HIT_MODE: ${HIT_MODE:-exact}
@@ -102,7 +104,7 @@ services:
       TERMINAL_UI: ${TERMINAL_UI:-true}
       TERMINAL_TOP_N: ${TERMINAL_TOP_N:-20}
       LOCAL_OUTPUT_DIR: /cache/output
-      GOOGLE_SHEETS_CREDENTIALS_PATH: ${GOOGLE_SHEETS_CREDENTIALS_PATH:-}
+      GOOGLE_SHEETS_CREDENTIALS_PATH: /credentials/sheets.json
       GOOGLE_SHEET_ID: ${GOOGLE_SHEET_ID:-}
     command: python3 /app/daemon.py
 

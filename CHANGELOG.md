@@ -1,5 +1,56 @@
 # Changelog
 
+## [Unreleased] — 2026-06-16
+
+### Added
+
+#### `start_engines.sh` (new file)
+One-command sequential cold-start for all three engines.
+- Starts V3 first → waits for cycle 0 to complete → starts Main → waits → starts Normalized → waits → launches coordinator
+- Stops any running engine containers before starting
+- Prevents simultaneous cold-start API hammering that caused mid-scan crashes
+- Usage: `cd ~/Developer/sma_engine && ./start_engines.sh`
+
+#### `status.sh` (new file)
+Quick status check for all engines and coordinator.
+- Shows running containers, timestamps of latest output files per engine, coordinator PID and last log lines
+- Lists all log commands for easy copy-paste
+- Usage: `cd ~/Developer/sma_engine && ./status.sh`
+
+#### `coordinator.py` (new file)
+Automatic staggering daemon for cycle 1+ (main → normalized → V3).
+- Watches output file mtimes every 10s via polling
+- Sends SIGUSR1 to each engine container to skip its sleep and run immediately
+- Chains: main output updated → signal normalized → normalized output updated → signal V3
+- Usage: `nohup python3 coordinator.py >> logs/coordinator.log 2>&1 &`
+
+### Modified
+
+#### `daemon_normalized.py` and `_v3_staging/daemon_v3.py`
+- Added SIGUSR1 handler (`RUN_NOW` flag) so coordinator can wake engines early without restart
+- Sleep loop breaks on `RUN_NOW` in 5s increments for fast signal response
+
+#### `market_overlay/systems_panel.py`
+- **SOX timeframe**: changed from 30m → 15m (`_system_sox` uses `"15m"` and 530-bar window)
+- **VIX fallback chain**: ^VIX yfinance → UVXY Webull → UVXY yfinance → VIXY yfinance — eliminates "loading" state
+
+#### `market_overlay/overlay.py`
+- **SPX Zero Gamma panel**: fixed label "SPY Spot" → "SPX Spot" (tikitrade returns SPX values ~5700, not SPY ~570)
+- **Panel layout**: replaced call wall / put wall lines with Expected Move range (lower — upper) and Vanna Inflection level; distance % shown inline with spot price
+
+#### `.env`
+- Added `NORM_INTERVAL_SECONDS=7200`, `V3_INTERVAL_SECONDS=7200` for coordinator-aligned sleep intervals
+- Added `ENGINE_SCAN_CONCURRENCY=1` to prevent parallel worker overload
+
+#### Ticker files (`custom_tickers.txt`, `normalized_tickers.txt`, `_v3_staging/v3_tickers.txt`)
+- **Round 1**: removed 62 bond ETFs (703 → 641 tickers)
+- **Round 2**: removed 10 Schwab bond ETFs: SCHJ, SCHQ, SCHO, SCHR, SCHZ, SCHP, SCHI, GSY, VRP, ARB (641 → 631)
+- **Round 3**: removed 11 noise tickers: UDN, UUP, IGHG, SEMY, CZR, CORN, DBA, SPDN, COM, BIZD, NFE (631 → 620)
+- **Round 4**: removed FXY (Japanese Yen ETF) and CLOB (options liquidity ETF) (620 → 618)
+- Total removed: 85 noise tickers — bond ETFs, currency ETFs, low-price/flat-vol names that dominated rankings with thousands of meaningless SMA hits
+
+---
+
 ## [Unreleased] — 2026-06-11
 
 ### Added

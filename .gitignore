@@ -78,5 +78,14 @@ market_overlay/latest_snapshot.json
 market_overlay/.gex_cache.json
 market_overlay/webull_data_sdk.log*
 
+# Root-level Webull SDK logs
+webull_data_sdk.log*
+
+# Coordinator / engine logs
+logs/
+
+# Ticker backups
+ticker_backup/
+
 # Excel snapshots / archives
 *.xlsx
