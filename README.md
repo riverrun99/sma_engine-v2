@@ -1,6 +1,6 @@
 # SMA Outfit Detection Engine
 
-Continuously scans ~1,700 tickers across 10 timeframes and 41 SMA outfits.
+Continuously scans **618 tickers** across 11 timeframes and 41 SMA outfits.
 For every combination it detects price-to-SMA contact, scores each level by
 the cumulative time price has spent there (measured in deciseconds), and ranks
 signals by multi-layer convergence. The methodology is based on the time-series
@@ -254,25 +254,25 @@ Three dashboards load automatically under the **SMA Engine** folder:
 ## Daily use
 
 ```bash
-# Start everything
-docker compose up -d
+# Start all engines sequentially (V3 → Main → Normalized → Coordinator)
+cd ~/Developer/sma_engine && ./start_engines.sh
 
-# Stop everything
-docker compose down
+# Check status of all engines, outputs, and coordinator
+cd ~/Developer/sma_engine && ./status.sh
 
-# Rebuild and restart engine only (after editing .py files)
-docker compose up -d --build engine
+# Start market overlay (run in a dedicated terminal window)
+cd ~/Developer/sma_engine/market_overlay && python3 overlay.py
 
-# Watch live logs
-docker compose logs -f engine
+# Live coordinator log
+tail -f ~/Developer/sma_engine/logs/coordinator.log
 
-# Check container status
-docker compose ps
-docker stats --no-stream
+# Live engine logs
+docker logs e47_engine -f
+docker logs e47_engine_normalized -f
+docker logs e47_engine_v3 -f
 
-# Attach to the live terminal dashboard
-docker attach e47_engine
-# Detach without stopping: Ctrl+P then Ctrl+Q
+# Stop all engines
+docker stop e47_engine e47_engine_normalized e47_engine_v3
 ```
 
 Code changes (`.py` files) take effect after:
@@ -293,6 +293,7 @@ auto-expires.
 | `tier1` | 143 | All major index ETFs, every leveraged pair (2x/3x bull/bear) for S&P/Nasdaq/Dow/Russell/semis, all 11 SPDR sectors + sub-sectors, precious metals, energy commodities, vol products, bonds/rates, crypto ETFs, China. This is the streaming tier. |
 | `tier2` | 40 | Individual mega-cap stocks: AAPL, MSFT, NVDA, GOOGL, META, TSLA, AMD, JPM, XOM, COIN, and others |
 | `all` | ~1,705 unique | Tier 1+2 + extended individual equities: S&P 500 components, mid-caps, healthcare, financials, industrials, REITs, international ADRs |
+| `custom` | **618** | Active curated universe used by all three engines. Bond ETFs, currency ETFs, and low-vol noise tickers have been removed. Defined in `custom_tickers.txt`. |
 
 Set via `ENGINE_UNIVERSE=tier1 / tier2 / all` in `.env`.
 
@@ -606,8 +607,13 @@ Check that your Webull account has streaming permissions. Engine logs show
 
 ```
 engine.py              Core: 41 outfits, 8 systems, hit detection, decisecond
-                       scoring, convergence, ~1,705-ticker universe
-daemon.py              Long-running scan loop (container entry point)
+                       scoring, convergence, 618-ticker curated universe
+daemon.py              Long-running scan loop (main engine entry point)
+daemon_normalized.py   Normalized engine daemon with SIGUSR1 staggering support
+_v3_staging/           V3 engine (grade/score/entry per signal)
+coordinator.py         Staggering daemon: signals normalized → V3 after main finishes
+start_engines.sh       One-command sequential cold-start: V3 → Main → Normalized
+status.sh              Quick status check: containers, output times, coordinator
 stream_client.py       MQTT sub-minute tick streaming + candle aggregation
 persistence.py         InfluxDB writer: candles, hits, signals, top-N,
                        system states, regimes + cumulative deciseconds query
@@ -621,16 +627,20 @@ async_fetch.py         Concurrent Webull fetcher with rate limiter
 run_pipeline.py        Single-cycle CLI runner (alternative to the daemon)
 mute.py                Batch mute/unmute tickers via command line
 tests.py               Test suite
-docker-compose.yml     Stack: InfluxDB + Grafana + engine
+docker-compose.yml     Stack: InfluxDB + Grafana + main engine
+docker-compose.normalized.yml  Normalized engine stack
 Dockerfile             Engine container definition
 requirements.txt       Python dependencies
 .env                   All configuration (gitignored)
 .env.example           Template with placeholder values (safe to commit)
-muted_tickers.txt      Tickers excluded each cycle (hot-reloaded, gitignored)
-custom_tickers.txt     Extra tickers added each cycle (hot-reloaded)
+muted_tickers.txt      Tickers excluded each cycle (hot-reloaded)
+custom_tickers.txt     618-ticker curated universe (hot-reloaded)
+normalized_tickers.txt Universe for normalized engine (mirrors custom_tickers.txt)
+market_overlay/        Terminal UI: The System + Zero Gamma + signals dashboard
 grafana/               Provisioned datasource + 3 dashboards (auto-loaded)
 output/                Engine output files (gitignored)
 credentials/           Google service account JSON (gitignored)
+logs/                  Coordinator log (gitignored)
 ```
 
 ---
