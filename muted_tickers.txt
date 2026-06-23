@@ -5,3 +5,12 @@
 # One ticker per line. Lines starting with # are comments.
 # Reset 2026-06-14: new curated custom_tickers.txt makes bulk mutes redundant.
 # =============================================================================
+
+PFXF
+
+HUM
+WFC
+AFL
+MO
+RHI
+VFC
