@@ -30,7 +30,7 @@ from engine import OUTFITS
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-CACHE_DIR = "/cache/candle_cache"
+CACHE_DIR = "/Users/riverrun/Developer/sma_engine/cache/candle_cache"
 OUTPUT_DIR = Path("./output")
 XLSX_PATH = OUTPUT_DIR / "signals_current.xlsx"
 RESULTS_PATH = OUTPUT_DIR / "backtest_results.csv"

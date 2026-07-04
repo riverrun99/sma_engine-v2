@@ -47,7 +47,7 @@ MUTED_TICKERS_PATH  = "/app/muted_tickers.txt"
 CUSTOM_TICKERS_PATH = "/app/custom_tickers.txt"
 
 # Disk cache — persists across restarts via engine_cache Docker volume
-CACHE_DIR = "/cache/candle_cache"
+CACHE_DIR = "/Users/riverrun/Developer/sma_engine/cache/candle_cache"
 
 
 def save_candle_cache(cache: dict, cache_dir: str = CACHE_DIR) -> None:

@@ -106,9 +106,11 @@ def fetch_gex(ticker: str = "SPX", spot_hint: float = None) -> dict:
     call_wall = top_wall("Call Walls")
     put_wall  = top_wall("Put Walls")
 
-    # Fill spot from SPY hint if Tikitrade didn't provide it (market closed, etc.)
-    if spot <= 0 and spot_hint:
-        spot = spot_hint * 10  # SPY ≈ SPX / 10
+    # Always prefer live SPY price when available (Tikitrade spot is daily snapshot, stale intraday)
+    if spot_hint:
+        spot = round(spot_hint * 10, 2)  # SPY ≈ SPX / 10 — live Webull price
+    elif spot <= 0:
+        pass  # no data available
 
     dist_pct = (spot - zero_gamma) / zero_gamma * 100 if (zero_gamma and spot) else 0
 
