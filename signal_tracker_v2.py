@@ -7,7 +7,7 @@ What it does:
   1. Reads the latest v3 xlsx output (top signals with grade/score/entry price)
   2. Logs new signals to output/signal_tracking/signal_log.json
   3. Fills in closing prices at +1d / +3d / +5d / +10d / +20d trading days
-     using yfinance — once a window is filled it is never re-fetched
+     using Webull API — once a window is filled it is never re-fetched
   4. Prints a summary table to the terminal
   5. Saves output/signal_tracking/performance_YYYY-MM-DD.csv
 
@@ -36,13 +36,38 @@ from pathlib import Path
 
 logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(message)s")
 
+# ── Load .env from parent directory (same pattern as overlay.py) ──────────────
+_env_path = Path(__file__).parent / ".env"
+if _env_path.exists():
+    with open(_env_path) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _k, _, _v = _line.partition("=")
+                os.environ.setdefault(_k.strip(), _v.strip())
+
 try:
     import pandas as pd
-    import yfinance as yf
 except ImportError as e:
     print(f"ERROR: Missing dependency — {e}")
-    print("Run: pip install pandas yfinance openpyxl --break-system-packages")
+    print("Run: pip install pandas openpyxl --break-system-packages")
     sys.exit(1)
+
+# ── Webull client ─────────────────────────────────────────────────────────────
+sys.path.insert(0, str(Path(__file__).parent))
+try:
+    from engine import WebullClient, MockClient
+    _wb_key    = os.environ.get("WEBULL_APP_KEY", "")
+    _wb_secret = os.environ.get("WEBULL_APP_SECRET", "")
+    if _wb_key and _wb_secret:
+        _webull_client = WebullClient(_wb_key, _wb_secret,
+                                      region=os.environ.get("WEBULL_REGION", "us"))
+    else:
+        _webull_client = None
+        print("  WARNING: WEBULL_APP_KEY/WEBULL_APP_SECRET not set — price fills unavailable")
+except Exception as _e:
+    _webull_client = None
+    print(f"  WARNING: Could not init Webull client — {_e}")
 
 # ── Paths — all reads from output/, all writes to output/signal_tracking/ ────
 BASE_DIR     = Path(__file__).parent
@@ -259,49 +284,32 @@ def fill_forward_returns(log: dict) -> int:
     if not to_fill:
         return 0
 
-    # Batch-download daily closes for all affected tickers
-    # Group tickers by earliest needed date, download in batches of 50
-    tickers_needed = list(earliest_dates.keys())
-    min_date       = min(earliest_dates.values()) - timedelta(days=1)
-    end_date       = today + timedelta(days=1)
+    if _webull_client is None:
+        print("  Skipping price fill — Webull client unavailable")
+        return 0
 
-    print(f"  Fetching daily history for {len(tickers_needed)} ticker(s) ...")
+    tickers_needed = list(earliest_dates.keys())
+    # How many daily bars to fetch: days since earliest detection + buffer
+    min_date   = min(earliest_dates.values())
+    days_back  = (today - min_date).days + 5
+    bar_count  = min(max(days_back, 30), 999)
+
+    print(f"  Fetching daily history for {len(tickers_needed)} ticker(s) via Webull ...")
     hist_by_ticker: dict[str, pd.Series] = {}
 
-    BATCH = 50
-    for i in range(0, len(tickers_needed), BATCH):
-        batch = tickers_needed[i : i + BATCH]
+    for ticker in tickers_needed:
         try:
-            raw = yf.download(
-                batch,
-                start=str(min_date),
-                end=str(end_date),
-                interval="1d",
-                progress=False,
-                auto_adjust=True,
-                threads=True,
-            )
-            if raw is None or raw.empty:
+            df = _webull_client.fetch_bars(ticker, "1d", bar_count)
+            if df is None or df.empty:
                 continue
-
-            if isinstance(raw.columns, pd.MultiIndex):
-                # Multiple tickers: (field, ticker) columns
-                if "Close" in raw.columns.get_level_values(0):
-                    closes_df = raw["Close"]
-                    for t in batch:
-                        if t in closes_df.columns:
-                            s = closes_df[t].dropna()
-                            if not s.empty:
-                                hist_by_ticker[t] = s
-            else:
-                # Single ticker in batch
-                if "Close" in raw.columns:
-                    s = raw["Close"].dropna()
-                    if not s.empty:
-                        hist_by_ticker[batch[0]] = s
-
+            # Index by date (drop time component)
+            df["date"] = pd.to_datetime(df["timestamp"]).dt.tz_localize(None).dt.date
+            s = df.set_index("date")["close"]
+            s.index = pd.to_datetime(s.index)
+            if not s.empty:
+                hist_by_ticker[ticker] = s
         except Exception as e:
-            logging.debug(f"Batch download error ({batch[:3]}...): {e}")
+            logging.debug(f"Webull fetch error ({ticker}): {e}")
             continue
 
     # Fill in forward returns for each signal
