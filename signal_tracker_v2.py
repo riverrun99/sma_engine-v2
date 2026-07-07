@@ -319,7 +319,7 @@ def fill_forward_returns(log: dict) -> int:
         # Filter to trading days strictly after detection date
         idx = pd.to_datetime(closes.index).tz_localize(None) if closes.index.tz else pd.to_datetime(closes.index)
         after_mask = idx > det_ts
-        after = closes[after_mask.values]
+        after = closes[after_mask]
 
         if after.empty:
             continue
