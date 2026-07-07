@@ -345,8 +345,8 @@ def build_performance_xlsx(log: dict, current_prices: dict,
 
 def main():
     parser = argparse.ArgumentParser(description="Normalized Engine Signal Performance Tracker")
-    parser.add_argument("--top",  type=int, default=50,
-                        help="Top N signals to track from each run (default: 50)")
+    parser.add_argument("--top",  type=int, default=100,
+                        help="Top N signals to track from each run (default: 100)")
     parser.add_argument("--days", type=int, default=90,
                         help="Drop signals older than N days (default: 90)")
     args = parser.parse_args()
@@ -443,7 +443,7 @@ def main():
     signals_with_prices = [
         (v["ticker"], v["timeframe"],
          v.get("initial_price", 0), current_prices.get(v["ticker"], 0))
-        for v in sorted(log.values(), key=lambda x: x.get("initial_rank", 9999))[:20]
+        for v in sorted(log.values(), key=lambda x: x.get("initial_rank", 9999))[:args.top]
         if current_prices.get(v["ticker"], 0) > 0
     ]
 
