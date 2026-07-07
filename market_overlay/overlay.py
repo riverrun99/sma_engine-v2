@@ -906,11 +906,28 @@ def fetch_all():
         except Exception:
             stock_gex = {}
 
+    # All index systems (cached 60s, fetch first so we have live prices for idx_gex hints)
+    all_systems = {}
+    try:
+        all_systems = systems_panel.fetch_all_systems()
+    except Exception:
+        all_systems = {}
+
     # Index GEX — QQQ, IWM, DIA (cached daily)
+    # Build live spot hints from Webull (systems_panel data) for all three tickers
     idx_gex = {}
     try:
         ndx_data = sys_data.get("nasdaq", {})
-        spot_hints = {"QQQ": ndx_data.get("close")} if ndx_data and "error" not in ndx_data else {}
+        spot_hints = {}
+        if ndx_data and "error" not in ndx_data and ndx_data.get("close"):
+            spot_hints["QQQ"] = ndx_data["close"]
+        if all_systems:
+            _iwm_s = all_systems.get("iwm", {})
+            if _iwm_s.get("close"):
+                spot_hints["IWM"] = _iwm_s["close"]
+            _dji_s = all_systems.get("dji_15m", {})
+            if _dji_s.get("close"):
+                spot_hints["DIA"] = _dji_s["close"]
         idx_gex = index_gex.fetch_all(spot_hints=spot_hints)
     except Exception:
         idx_gex = {}
@@ -920,13 +937,6 @@ def fetch_all():
         sheets_sync.sync_all(sys_data=sys_data, gex_data=gex_data)
     except Exception:
         pass
-
-    # All index systems (cached 5 min, safe to call every cycle)
-    all_systems = {}
-    try:
-        all_systems = systems_panel.fetch_all_systems()
-    except Exception:
-        all_systems = {}
 
     # Write JSON snapshot for live artifact dashboard
     write_snapshot(sys_data, gex_data, signals, macro, idx_gex)
