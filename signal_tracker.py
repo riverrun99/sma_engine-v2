@@ -40,7 +40,7 @@ except ImportError as e:
     sys.exit(1)
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-OUTPUT_DIR   = Path("/cache/output/normalized_engine")
+OUTPUT_DIR   = Path(__file__).parent / "output" / "normalized_engine"
 SIGNAL_LOG   = OUTPUT_DIR / "signal_log.json"
 
 # ── Colour palette ────────────────────────────────────────────────────────────
