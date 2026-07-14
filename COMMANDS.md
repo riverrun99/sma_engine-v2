@@ -121,6 +121,8 @@ docker exec e47_engine printenv | grep ENGINE
 
 ---
 
+---
+
 ## Discovery Engine
 
 ```bash
@@ -190,27 +192,48 @@ docker exec e47_engine python /app/trade_engine.py --min-rr 1.0
 
 ---
 
-## Signal Forward Return Tracker
+## Signal Forward Return Trackers
 
+Three trackers — each tracks a different signal source and measures +1d/+3d/+5d/+10d/+20d forward returns.
+
+### V3 Engine Tracker (signal_tracker_v2.py)
 ```bash
-# Update log + print report (run after any engine cycle)
-cd ~/Developer/sma_engine && python3 signal_tracker_v2.py
-
-# Track top 50 signals only
-cd ~/Developer/sma_engine && python3 signal_tracker_v2.py --top 50
-
-# Print report only — no price fetch, no log update
-cd ~/Developer/sma_engine && python3 signal_tracker_v2.py --report
-
-# Update + save CSV report to output/signal_tracking/
-cd ~/Developer/sma_engine && python3 signal_tracker_v2.py --csv
-
-# Drop signals older than 30 days (default 60)
-cd ~/Developer/sma_engine && python3 signal_tracker_v2.py --prune 30
+cd ~/Developer/sma_engine && python3 signal_tracker_v2.py              # update + report
+cd ~/Developer/sma_engine && python3 signal_tracker_v2.py --top 50     # top 50 only
+cd ~/Developer/sma_engine && python3 signal_tracker_v2.py --report     # report only
+cd ~/Developer/sma_engine && python3 signal_tracker_v2.py --csv        # save CSV
+cd ~/Developer/sma_engine && python3 signal_tracker_v2.py --prune 30   # prune >30d
 ```
-
 Log: `output/signal_tracking/signal_log.json`
-Reports: `output/signal_tracking/performance_YYYY-MM-DD.csv`
+
+### Main Engine Tracker (signal_tracker_main.py)
+Tracks top signals from the main engine snapshot (signals_current / snapshots/).
+```bash
+cd ~/Developer/sma_engine && python3 signal_tracker_main.py              # update + report
+cd ~/Developer/sma_engine && python3 signal_tracker_main.py --top 30    # top 30 only
+cd ~/Developer/sma_engine && python3 signal_tracker_main.py --report    # report only
+cd ~/Developer/sma_engine && python3 signal_tracker_main.py --csv       # save CSV
+cd ~/Developer/sma_engine && python3 signal_tracker_main.py --prune 30  # prune >30d
+```
+Log: `output/signal_tracking/main_signal_log.json`
+
+### Triangulated Tracker (signal_tracker_triangulated.py)
+Cross-references all engines (main + V3 + normalized + discovery + backtest).
+Only logs signals scoring >= 2.5 (appearing in 2+ sources).
+```bash
+cd ~/Developer/sma_engine && python3 signal_tracker_triangulated.py                   # update + report
+cd ~/Developer/sma_engine && python3 signal_tracker_triangulated.py --top 30          # top 30
+cd ~/Developer/sma_engine && python3 signal_tracker_triangulated.py --report          # report only
+cd ~/Developer/sma_engine && python3 signal_tracker_triangulated.py --csv             # save CSV
+cd ~/Developer/sma_engine && python3 signal_tracker_triangulated.py --min-score 3.5   # higher bar
+cd ~/Developer/sma_engine && python3 signal_tracker_triangulated.py --prune 30        # prune >30d
+```
+Log: `output/signal_tracking/triangulated_signal_log.json`
+
+### Run all three at once
+```bash
+cd ~/Developer/sma_engine && python3 signal_tracker_v2.py --csv && python3 signal_tracker_main.py --csv && python3 signal_tracker_triangulated.py --csv
+```
 
 ---
 
