@@ -1,5 +1,27 @@
 # Changelog
 
+## 74947e3 — Jul 14, 2026
+
+### Added
+
+#### `signal_tracker_main.py` (new)
+Tracks top signals from the main engine snapshot output. Logs new signals each cycle with ticker, timeframe, outfit, score, and convergence. Fetches entry price via Webull on first run, then fills forward returns at +1d/+3d/+5d/+10d/+20d. Prints color-coded return table and optional CSV report.
+Log: `output/signal_tracking/main_signal_log.json`
+
+#### `signal_tracker_triangulated.py` (new)
+Cross-references all engine outputs (main snapshot + V3 + normalized + confluence/discovery/backtest) and scores each ticker across all sources. Only logs signals scoring ≥ 2.5 (meaningful multi-engine agreement). Tracks forward returns with the same window set and reports win rate and average return by detection date.
+Log: `output/signal_tracking/triangulated_signal_log.json`
+
+### Modified
+
+#### `COMMANDS.md`
+Signal tracker section expanded to cover all three trackers (V3, main, triangulated) with full flag reference and a one-liner to run all three at once.
+
+#### `custom_tickers.txt`
+Added UNG (United States Natural Gas Fund) and NRGL to the energy/commodity universe.
+
+---
+
 ## [Unreleased] — 2026-06-16
 
 ### Added
