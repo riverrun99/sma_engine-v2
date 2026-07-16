@@ -153,6 +153,19 @@ def main() -> None:
                     ["python3", "/app/confluence_engine.py", "--min-score", "2", "--discovery-tf", "1d,1w,1mo"],
                     "CONFLUENCE"
                 )
+                # ── Sync to Google Sheets ─────────────────────────────────────
+                try:
+                    logging.info("Syncing to Google Sheets...")
+                    result = subprocess.run(
+                        ["python3", os.path.join(BASE, "market_overlay", "sheets_sync.py")],
+                        capture_output=True, text=True, timeout=120
+                    )
+                    if result.returncode == 0:
+                        logging.info("Sheets sync complete")
+                    else:
+                        logging.warning(f"Sheets sync exited {result.returncode}: {result.stderr.strip()[:200]}")
+                except Exception as e:
+                    logging.error(f"Sheets sync failed: {e}")
                 logging.info("Cycle complete — signalling main engine to start next cycle.")
                 signal_container(MAIN_CONTAINER)
                 triggered_norm = False
