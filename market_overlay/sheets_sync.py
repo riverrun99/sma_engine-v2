@@ -1,13 +1,20 @@
 """
 sheets_sync.py — Writes all engine output categories to Google Sheets.
 =====================================================================
-Tabs written:
+Tabs written (latest data — overwrite each sync):
   Current       — main engine snapshot (read from signals_current.xlsx)
   Discovery     — latest discovery engine output
   Confluence    — latest confluence engine output
   Backtest      — latest backtest results
   Triangulation — top triangulated signals (overlay composite)
   Overlay       — The System + Zero Gamma snapshot
+
+Log tabs (append only — historical accumulation, never wiped):
+  Snapshot_Log    — every snapshot run, date-stamped
+  Confluence_Log  — every confluence run, date-stamped
+  Backtest_Log    — every backtest run, date-stamped
+  Trades_Log      — every trade suggestion, date-stamped
+  Signal_Log      — triangulated signal tracker performance
 
 Run standalone:  python3 sheets_sync.py
 Or import and call sync_all() from overlay.py after each refresh.
@@ -36,6 +43,11 @@ OUTPUT_DIR   = Path(__file__).parent.parent / "output"
 CREDS_PATH   = os.environ.get("GOOGLE_SHEETS_CREDENTIALS_PATH", "")
 SHEET_ID     = os.environ.get("GOOGLE_SHEET_ID", "")
 SCOPES       = ["https://www.googleapis.com/auth/spreadsheets"]
+
+# State file — tracks last-logged filename per category to avoid re-appending
+STATE_FILE   = Path(__file__).parent.parent / "logs" / "sheets_sync_state.json"
+LOG_TABS     = ["Snapshot_Log", "Confluence_Log", "Backtest_Log", "Trades_Log",
+                "Signal_Log", "V2_Signal_Log", "Main_Signal_Log"]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 log = logging.getLogger("sheets_sync")
@@ -88,6 +100,41 @@ def _write_tab(svc, tab: str, rows: list[list]):
         log.info(f"  ✓ {tab}: {len(rows)} rows written")
     except Exception as e:
         log.warning(f"  ✗ {tab}: write failed — {e}")
+
+
+def _append_tab(svc, tab: str, rows: list[list]):
+    """Append rows to a log tab — never clears existing data."""
+    try:
+        svc.spreadsheets().values().append(
+            spreadsheetId=SHEET_ID,
+            range=f"{tab}!A1",
+            valueInputOption="RAW",
+            insertDataOption="INSERT_ROWS",
+            body={"values": rows}).execute()
+        log.info(f"  ✓ {tab}: +{len(rows)} rows appended")
+    except Exception as e:
+        log.warning(f"  ✗ {tab}: append failed — {e}")
+
+
+def _load_sync_state() -> dict:
+    """Load last-synced file tracking state."""
+    if STATE_FILE.exists():
+        try:
+            return json.loads(STATE_FILE.read_text())
+        except Exception:
+            return {}
+    return {}
+
+
+def _save_sync_state(state: dict):
+    """Persist sync state to disk."""
+    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    STATE_FILE.write_text(json.dumps(state, indent=2))
+
+
+def _prepend_date(rows: list[list], date_str: str) -> list[list]:
+    """Prepend a date/timestamp column to every row."""
+    return [[date_str] + [str(v) for v in row] for row in rows]
 
 
 # ── Data readers ──────────────────────────────────────────────────────────────
@@ -320,10 +367,130 @@ def build_overlay_rows(sys_data: dict = None, gex_data: dict = None) -> list[lis
     return rows
 
 
+# ── Log tab builders (append-only, historical accumulation) ──────────────────
+
+def _sync_logs(svc, state: dict) -> dict:
+    """
+    Append new rows to each log tab if the underlying file has changed since
+    last sync. Returns updated state dict.
+    """
+    now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    # ── Snapshot_Log ──────────────────────────────────────────────────────────
+    snap_files = sorted((OUTPUT_DIR / "snapshots").glob("*.csv")) if (OUTPUT_DIR / "snapshots").exists() else []
+    if snap_files:
+        snap_path = snap_files[-1]
+        snap_key  = f"snapshot:{snap_path.name}"
+        if state.get("Snapshot_Log") != snap_key:
+            rows = _read_csv(snap_path)
+            if rows:
+                header = rows[0]
+                data   = rows[1:]
+                if not state.get("Snapshot_Log"):          # first time — write header
+                    _append_tab(svc, "Snapshot_Log", [["synced_utc"] + header])
+                _append_tab(svc, "Snapshot_Log", _prepend_date(data, now_str))
+                state["Snapshot_Log"] = snap_key
+
+    # ── Confluence_Log ────────────────────────────────────────────────────────
+    conf_path = _latest_csv("confluence")
+    if conf_path:
+        conf_key = f"confluence:{conf_path.name}"
+        if state.get("Confluence_Log") != conf_key:
+            rows = _read_csv(conf_path)
+            if rows:
+                header = rows[0]
+                data   = rows[1:]
+                if not state.get("Confluence_Log"):
+                    _append_tab(svc, "Confluence_Log", [["synced_utc"] + header])
+                _append_tab(svc, "Confluence_Log", _prepend_date(data, now_str))
+                state["Confluence_Log"] = conf_key
+
+    # ── Backtest_Log ──────────────────────────────────────────────────────────
+    bt_path = _latest_root_csv("backtest_")
+    if bt_path:
+        bt_key = f"backtest:{bt_path.name}"
+        if state.get("Backtest_Log") != bt_key:
+            rows = _read_csv(bt_path)
+            if rows:
+                header = rows[0]
+                data   = rows[1:]
+                if not state.get("Backtest_Log"):
+                    _append_tab(svc, "Backtest_Log", [["synced_utc"] + header])
+                _append_tab(svc, "Backtest_Log", _prepend_date(data, now_str))
+                state["Backtest_Log"] = bt_key
+
+    # ── Trades_Log ────────────────────────────────────────────────────────────
+    trades_path = _latest_csv("trades")
+    if not trades_path:
+        trades_path = _latest_root_csv("trades_")
+    if trades_path:
+        trades_key = f"trades:{trades_path.name}"
+        if state.get("Trades_Log") != trades_key:
+            rows = _read_csv(trades_path)
+            if rows:
+                header = rows[0]
+                data   = rows[1:]
+                if not state.get("Trades_Log"):
+                    _append_tab(svc, "Trades_Log", [["synced_utc"] + header])
+                _append_tab(svc, "Trades_Log", _prepend_date(data, now_str))
+                state["Trades_Log"] = trades_key
+
+    # ── Signal_Log (triangulated tracker) ────────────────────────────────────
+    sig_dir = OUTPUT_DIR / "signal_tracking"
+    if sig_dir.exists():
+        sig_files = sorted(sig_dir.glob("triangulated_performance_*.csv"))
+        if sig_files:
+            sig_path = sig_files[-1]
+            sig_key  = f"signal:{sig_path.name}"
+            if state.get("Signal_Log") != sig_key:
+                rows = _read_csv(sig_path)
+                if rows:
+                    header = rows[0]
+                    data   = rows[1:]
+                    if not state.get("Signal_Log"):
+                        _append_tab(svc, "Signal_Log", [["synced_utc"] + header])
+                    _append_tab(svc, "Signal_Log", _prepend_date(data, now_str))
+                    state["Signal_Log"] = sig_key
+
+    # ── V2_Signal_Log (V3 engine signal tracker) ──────────────────────────────
+    if sig_dir.exists():
+        v2_files = sorted(sig_dir.glob("performance_*.csv"))
+        if v2_files:
+            v2_path = v2_files[-1]
+            v2_key  = f"v2signal:{v2_path.name}"
+            if state.get("V2_Signal_Log") != v2_key:
+                rows = _read_csv(v2_path)
+                if rows:
+                    header = rows[0]
+                    data   = rows[1:]
+                    if not state.get("V2_Signal_Log"):
+                        _append_tab(svc, "V2_Signal_Log", [["synced_utc"] + header])
+                    _append_tab(svc, "V2_Signal_Log", _prepend_date(data, now_str))
+                    state["V2_Signal_Log"] = v2_key
+
+    # ── Main_Signal_Log (main engine signal tracker) ──────────────────────────
+    if sig_dir.exists():
+        main_files = sorted(sig_dir.glob("main_performance_*.csv"))
+        if main_files:
+            main_path = main_files[-1]
+            main_key  = f"mainsignal:{main_path.name}"
+            if state.get("Main_Signal_Log") != main_key:
+                rows = _read_csv(main_path)
+                if rows:
+                    header = rows[0]
+                    data   = rows[1:]
+                    if not state.get("Main_Signal_Log"):
+                        _append_tab(svc, "Main_Signal_Log", [["synced_utc"] + header])
+                    _append_tab(svc, "Main_Signal_Log", _prepend_date(data, now_str))
+                    state["Main_Signal_Log"] = main_key
+
+    return state
+
+
 # ── Main sync ─────────────────────────────────────────────────────────────────
 
 TABS = ["Current", "Discovery", "Confluence", "Backtest", "Trades",
-        "Normalized", "V3", "Triangulation", "Overlay"]
+        "Normalized", "V3", "Triangulation", "Overlay"] + LOG_TABS
 
 
 def sync_all(sys_data: dict = None, gex_data: dict = None):
@@ -356,6 +523,12 @@ def sync_all(sys_data: dict = None, gex_data: dict = None):
             _write_tab(svc, tab, rows)
         except Exception as e:
             log.warning(f"  ✗ {tab}: builder error — {e}")
+
+    # ── Append-only log tabs (historical accumulation) ────────────────────────
+    log.info("Syncing log tabs...")
+    state = _load_sync_state()
+    state = _sync_logs(svc, state)
+    _save_sync_state(state)
 
     log.info("Sheets sync complete.")
 

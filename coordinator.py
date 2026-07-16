@@ -41,6 +41,8 @@ V3_CONTAINER   = "e47_engine_v3"
 
 MAIN_CONTAINER = "e47_engine"
 POLL_INTERVAL  = 10  # seconds between checks
+NORM_STAGGER   = 180  # seconds to wait after main output before triggering normalized
+                      # gives main engine time to free candle cache before normalized loads its own
 
 
 def latest_mtime(pattern: str) -> float:
@@ -99,6 +101,7 @@ def main() -> None:
     # State machine: track what we've triggered this chain
     triggered_norm = False
     triggered_v3   = False
+    norm_trigger_at = None  # timestamp when we should fire normalized
 
     logging.info(
         f"Baseline — main: {datetime.fromtimestamp(last_main_mtime).strftime('%H:%M:%S') if last_main_mtime else 'none'}, "
@@ -112,12 +115,18 @@ def main() -> None:
         # ── Check main engine output ──────────────────────────────────────────
         current_main = file_mtime(MAIN_FILE)
         if current_main > last_main_mtime:
-            logging.info(f"Main engine output updated — triggering normalized")
             last_main_mtime = current_main
             triggered_norm = False
             triggered_v3   = False
+            norm_trigger_at = time.time() + NORM_STAGGER
+            logging.info(f"Main engine output updated — normalized queued in {NORM_STAGGER}s (stagger to free candle cache)")
+
+        # ── Fire normalized after stagger delay ───────────────────────────────
+        if norm_trigger_at and not triggered_norm and time.time() >= norm_trigger_at:
+            logging.info(f"Stagger elapsed — triggering normalized")
             signal_container(NORM_CONTAINER)
             triggered_norm = True
+            norm_trigger_at = None
 
         # ── Check normalized output (only after we triggered it) ──────────────
         if triggered_norm and not triggered_v3:

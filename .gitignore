@@ -89,3 +89,8 @@ ticker_backup/
 
 # Excel snapshots / archives
 *.xlsx
+
+# Outfit discovery — not for distribution
+outfit_discovery.py
+OUTFIT_DISCOVERY_NOTE.txt
+output/outfit_discovery/
