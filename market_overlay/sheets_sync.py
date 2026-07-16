@@ -47,7 +47,9 @@ SCOPES       = ["https://www.googleapis.com/auth/spreadsheets"]
 # State file — tracks last-logged filename per category to avoid re-appending
 STATE_FILE   = Path(__file__).parent.parent / "logs" / "sheets_sync_state.json"
 LOG_TABS     = ["Snapshot_Log", "Confluence_Log", "Backtest_Log", "Trades_Log",
-                "Signal_Log", "V2_Signal_Log", "Main_Signal_Log"]
+                "Signal_Log", "V2_Signal_Log", "Main_Signal_Log",
+                "Current_Log", "Discovery_Log", "Normalized_Log", "V3_Log",
+                "Triangulation_Log", "Overlay_Log"]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 log = logging.getLogger("sheets_sync")
@@ -483,6 +485,105 @@ def _sync_logs(svc, state: dict) -> dict:
                         _append_tab(svc, "Main_Signal_Log", [["synced_utc"] + header])
                     _append_tab(svc, "Main_Signal_Log", _prepend_date(data, now_str))
                     state["Main_Signal_Log"] = main_key
+
+    # ── Current_Log ───────────────────────────────────────────────────────────
+    current_path = OUTPUT_DIR / "signals_current.xlsx"
+    if current_path.exists():
+        current_key = f"current:{current_path.stat().st_mtime:.0f}"
+        if state.get("Current_Log") != current_key:
+            rows = build_current_rows()
+            if rows:
+                if not state.get("Current_Log"):
+                    _append_tab(svc, "Current_Log", [["synced_utc"] + list(rows[0])])
+                _append_tab(svc, "Current_Log", _prepend_date(rows[1:], now_str))
+            state["Current_Log"] = current_key
+
+    # ── Discovery_Log ─────────────────────────────────────────────────────────
+    disc_log_path = _latest_csv("discovery")
+    if disc_log_path:
+        disc_log_key = f"discovery_log:{disc_log_path.name}"
+        if state.get("Discovery_Log") != disc_log_key:
+            rows = _read_csv(disc_log_path)
+            if rows:
+                if not state.get("Discovery_Log"):
+                    _append_tab(svc, "Discovery_Log", [["synced_utc"] + rows[0]])
+                _append_tab(svc, "Discovery_Log", _prepend_date(rows[1:], now_str))
+            state["Discovery_Log"] = disc_log_key
+
+    # ── Normalized_Log ────────────────────────────────────────────────────────
+    norm_log_dir = OUTPUT_DIR / "normalized_engine"
+    if norm_log_dir.exists():
+        norm_log_files = sorted(norm_log_dir.glob("*.xlsx"))
+        if norm_log_files:
+            norm_log_path = norm_log_files[-1]
+            norm_log_key = f"normalized_log:{norm_log_path.name}"
+            if state.get("Normalized_Log") != norm_log_key:
+                try:
+                    import openpyxl
+                    wb = openpyxl.load_workbook(norm_log_path, read_only=True, data_only=True)
+                    ws = wb.active
+                    rows = [[("" if v is None else v) for v in row] for row in ws.iter_rows(values_only=True)]
+                    wb.close()
+                    if rows:
+                        if not state.get("Normalized_Log"):
+                            _append_tab(svc, "Normalized_Log", [["synced_utc"] + list(rows[0])])
+                        _append_tab(svc, "Normalized_Log", _prepend_date(rows[1:], now_str))
+                    state["Normalized_Log"] = norm_log_key
+                except Exception as e:
+                    log.warning(f"Normalized_Log read error: {e}")
+
+    # ── V3_Log ────────────────────────────────────────────────────────────────
+    v3_log_dir = OUTPUT_DIR / "v3"
+    if v3_log_dir.exists():
+        v3_log_files = sorted(v3_log_dir.glob("*.xlsx"))
+        if v3_log_files:
+            v3_log_path = v3_log_files[-1]
+            v3_log_key = f"v3_log:{v3_log_path.name}"
+            if state.get("V3_Log") != v3_log_key:
+                try:
+                    import openpyxl
+                    wb = openpyxl.load_workbook(v3_log_path, read_only=True, data_only=True)
+                    ws = wb.active
+                    rows = [[("" if v is None else v) for v in row] for row in ws.iter_rows(values_only=True)]
+                    wb.close()
+                    if rows:
+                        if not state.get("V3_Log"):
+                            _append_tab(svc, "V3_Log", [["synced_utc"] + list(rows[0])])
+                        _append_tab(svc, "V3_Log", _prepend_date(rows[1:], now_str))
+                    state["V3_Log"] = v3_log_key
+                except Exception as e:
+                    log.warning(f"V3_Log read error: {e}")
+
+    # ── Triangulation_Log — append once per V3 cycle ──────────────────────────
+    v3_key_for_tri = state.get("V3_Log", "")
+    if v3_key_for_tri and state.get("Triangulation_Log") != v3_key_for_tri:
+        try:
+            tri_rows = build_triangulation_rows()
+            data_rows = [r for r in tri_rows if r and len(r) > 1 and r[0] not in
+                         ["TRIANGULATION — Top Signals", "Updated:", ""]]
+            if data_rows:
+                if not state.get("Triangulation_Log"):
+                    _append_tab(svc, "Triangulation_Log",
+                                [["synced_utc", "#", "Ticker", "Score", "Engines",
+                                  "V3 State", "Norm Conv", "Orig Conv", "Disc TF",
+                                  "Disc SMA", "Entry Price"]])
+                _append_tab(svc, "Triangulation_Log", _prepend_date(data_rows, now_str))
+            state["Triangulation_Log"] = v3_key_for_tri
+        except Exception as e:
+            log.warning(f"Triangulation_Log error: {e}")
+
+    # ── Overlay_Log — append once per V3 cycle ───────────────────────────────
+    if v3_key_for_tri and state.get("Overlay_Log") != v3_key_for_tri:
+        try:
+            ov_rows = build_overlay_rows()
+            flat = [r for r in ov_rows if r and any(str(v).strip() for v in r)]
+            if flat:
+                if not state.get("Overlay_Log"):
+                    _append_tab(svc, "Overlay_Log", [["synced_utc", "key", "value"]])
+                _append_tab(svc, "Overlay_Log", _prepend_date(flat, now_str))
+            state["Overlay_Log"] = v3_key_for_tri
+        except Exception as e:
+            log.warning(f"Overlay_Log error: {e}")
 
     return state
 
