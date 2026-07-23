@@ -49,7 +49,7 @@ STATE_FILE   = Path(__file__).parent.parent / "logs" / "sheets_sync_state.json"
 LOG_TABS     = ["Snapshot_Log", "Confluence_Log", "Backtest_Log", "Trades_Log",
                 "Signal_Log", "V2_Signal_Log", "Main_Signal_Log",
                 "Current_Log", "Discovery_Log", "Normalized_Log", "V3_Log",
-                "Triangulation_Log", "Overlay_Log"]
+                "Triangulation_Log", "Overlay_Log", "Operator_Log"]
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 log = logging.getLogger("sheets_sync")
@@ -281,20 +281,54 @@ def build_triangulation_rows() -> list[list]:
 
 
 def build_v3_rows() -> list[list]:
-    path = _latest_csv("v3")
-    rows = _read_csv(path)
-    if not rows:
-        # Try output/v3/ subfolder with any file type
-        v3_dir = OUTPUT_DIR / "v3"
-        if v3_dir.exists():
-            files = sorted(v3_dir.iterdir())
-            if files:
-                path = files[-1]
-                rows = _read_csv(path)
+    import openpyxl
+    v3_dir = OUTPUT_DIR / "v3"
+    path = None
+    if v3_dir.exists():
+        xlsx_files = sorted(v3_dir.glob("*.xlsx"))
+        if xlsx_files:
+            path = xlsx_files[-1]
+    if not path:
+        return [["No V3 data found"]]
+    try:
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        ws = wb.active
+        rows = [[("" if v is None else str(v)) for v in row] for row in ws.iter_rows(values_only=True)]
+        wb.close()
+    except Exception as e:
+        return [[f"V3 read error: {e}"]]
     if not rows:
         return [["No V3 data found"]]
     header_extra = [["V3 ENGINE — Latest Output"],
-                    [f"File: {path.name if path else '—'}"],
+                    [f"File: {path.name}"],
+                    [f"Updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"],
+                    []]
+    return header_extra + rows
+
+
+def build_operator_rows() -> list[list]:
+    """Latest operator board export (opboard.py --export)."""
+    import openpyxl
+    op_dir = OUTPUT_DIR / "operator"
+    path = None
+    if op_dir.exists():
+        xlsx_files = sorted(op_dir.glob("operator_*.xlsx"))
+        if xlsx_files:
+            path = xlsx_files[-1]
+    if not path:
+        return [["No operator data found — run: python3 opboard.py --export"]]
+    try:
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        ws = wb.active
+        rows = [[("" if v is None else str(v)) for v in row]
+                for row in ws.iter_rows(values_only=True)]
+        wb.close()
+    except Exception as e:
+        return [[f"Operator read error: {e}"]]
+    if not rows:
+        return [["No operator data found"]]
+    header_extra = [["OPERATOR BOARD — Raw Cross-Engine View"],
+                    [f"File: {path.name}"],
                     [f"Updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"],
                     []]
     return header_extra + rows
@@ -554,6 +588,29 @@ def _sync_logs(svc, state: dict) -> dict:
                 except Exception as e:
                     log.warning(f"V3_Log read error: {e}")
 
+    # ── Operator_Log ──────────────────────────────────────────────────────────
+    op_dir = OUTPUT_DIR / "operator"
+    if op_dir.exists():
+        op_files = sorted(op_dir.glob("operator_*.xlsx"))
+        if op_files:
+            op_path = op_files[-1]
+            op_key = f"operator_log:{op_path.name}"
+            if state.get("Operator_Log") != op_key:
+                try:
+                    import openpyxl
+                    wb = openpyxl.load_workbook(op_path, read_only=True, data_only=True)
+                    ws = wb.active
+                    rows = [[("" if v is None else v) for v in row]
+                            for row in ws.iter_rows(values_only=True)]
+                    wb.close()
+                    if rows:
+                        if not state.get("Operator_Log"):
+                            _append_tab(svc, "Operator_Log", [["synced_utc"] + list(rows[0])])
+                        _append_tab(svc, "Operator_Log", _prepend_date(rows[1:], now_str))
+                    state["Operator_Log"] = op_key
+                except Exception as e:
+                    log.warning(f"Operator_Log read error: {e}")
+
     # ── Triangulation_Log — append once per V3 cycle ──────────────────────────
     v3_key_for_tri = state.get("V3_Log", "")
     if v3_key_for_tri and state.get("Triangulation_Log") != v3_key_for_tri:
@@ -591,7 +648,7 @@ def _sync_logs(svc, state: dict) -> dict:
 # ── Main sync ─────────────────────────────────────────────────────────────────
 
 TABS = ["Current", "Discovery", "Confluence", "Backtest", "Trades",
-        "Normalized", "V3", "Triangulation", "Overlay"] + LOG_TABS
+        "Normalized", "V3", "Triangulation", "Overlay", "Operator"] + LOG_TABS
 
 
 def sync_all(sys_data: dict = None, gex_data: dict = None):
@@ -616,6 +673,7 @@ def sync_all(sys_data: dict = None, gex_data: dict = None):
         "V3":            build_v3_rows,
         "Triangulation": build_triangulation_rows,
         "Overlay":       lambda: build_overlay_rows(sys_data, gex_data),
+        "Operator":      build_operator_rows,
     }
 
     for tab, builder in tab_data.items():

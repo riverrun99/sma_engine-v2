@@ -30,7 +30,9 @@ from engine import OUTFITS
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-CACHE_DIR = "/Users/riverrun/Developer/sma_engine/cache/candle_cache"
+# Candle cache — inside the container this is the engine_cache volume mount.
+# Override with ENGINE_CACHE_DIR when running on the host.
+CACHE_DIR = os.environ.get("ENGINE_CACHE_DIR", "/cache/candle_cache")
 OUTPUT_DIR = Path("./output")
 XLSX_PATH = OUTPUT_DIR / "signals_current.xlsx"
 RESULTS_PATH = OUTPUT_DIR / "backtest_results.csv"

@@ -30,7 +30,7 @@ if [[ "$MODE" == "all" || "$MODE" == "engines" ]]; then
   info "Containers: e47_influxdb, e47_grafana, e47_engine, e47_engine_normalized"
 
   step "Starting V3 engine..."
-  cd "$HOME/Developer/sma_engine_v3"
+  cd "$HOME/Developer/sma_engine/_v3_staging"
   docker compose -f docker-compose.v3.yml up -d
   info "Container: e47_engine_v3"
 

@@ -2410,14 +2410,11 @@ def load_normalized_tickers(path: str = NORMALIZED_TICKERS_PATH) -> list[str]:
 
 def _check_influx() -> tuple:
     """
-    Connect to InfluxDB, verify health, and query cumulative deciseconds.
+    Connect to InfluxDB and verify health.
 
-    Returns (persist, cumulative_ds) where:
-      - persist is an InfluxPersistence instance (or NullPersistence if unavailable)
-      - cumulative_ds is a dict of cross-cycle decisecond totals (or {} if unavailable)
-
-    Logs a clear status line at startup so you always know whether the engine
-    is running with full cross-cycle history or in-cycle only.
+    Returns (persist, {}) where persist is an InfluxPersistence instance
+    (or None if unavailable). Cumulative deciseconds are loaded separately
+    after the scan, filtered to tickers with actual hits (see _load_cumulative_ds).
     """
     try:
         from persistence import InfluxPersistence, NullPersistence
@@ -2433,20 +2430,28 @@ def _check_influx() -> tuple:
         return persist, {}
 
     logging.info("  [INFLUX] ✅ Connected")
-    print("  [INFLUX] ✅ Connected — querying cumulative deciseconds...")
+    print("  [INFLUX] ✅ Connected — cumulative_ds will load after scan (filtered to hit tickers)")
+    return persist, {}
 
+
+def _load_cumulative_ds(persist, hit_tickers: set) -> dict:
+    """
+    Load cumulative deciseconds from InfluxDB, filtered to tickers with current hits.
+    Called after engine.scan() so we know which tickers to query.
+    Avoids loading the full 100k+ key dataset which causes OOM.
+    """
+    if not persist or not getattr(persist, '_connected', False):
+        return {}
     try:
-        cumulative_ds = persist.query_cumulative_deciseconds(window_days=7)
+        cumulative_ds = persist.query_cumulative_deciseconds(window_days=7, tickers=hit_tickers)
         if cumulative_ds:
-            logging.info(f"  [INFLUX] ✅ {len(cumulative_ds):,} cumulative_ds keys loaded (7d window)")
-            print(f"  [INFLUX] ✅ {len(cumulative_ds):,} level keys loaded from InfluxDB (7-day window)")
-        else:
-            logging.warning("  [INFLUX] ⚠️  Connected but no decisecond data found — first run or empty bucket")
-            print("  [INFLUX] ⚠️  Connected but no data yet — running in-cycle only this pass")
-        return persist, cumulative_ds
+            logging.info(f"  [INFLUX] ✅ {len(cumulative_ds):,} cumulative_ds keys loaded ({len(hit_tickers)} tickers with hits)")
+            print(f"  [INFLUX] ✅ {len(cumulative_ds):,} level keys loaded (filtered to {len(hit_tickers)} hit tickers)")
+        return cumulative_ds
     except Exception as e:
-        logging.warning(f"  [INFLUX] ⚠️  Query failed: {e}")
+        logging.warning(f"  [INFLUX] ⚠️  cumulative_ds query failed: {e}")
         print(f"  [INFLUX] ⚠️  Query failed ({e}) — running in-cycle only")
+        return {}
         return persist, {}
 
 
@@ -2533,6 +2538,10 @@ def main():
     engine = SMAOutfitEngine(client, cfg)
     engine.monitor_systems()
     engine.scan()
+
+    # Load cumulative_ds after scan, filtered to tickers with hits (avoids OOM)
+    hit_tickers = {entry.ticker for entry in engine.store.all()}
+    cumulative_ds = _load_cumulative_ds(persist, hit_tickers)
 
     signal = engine.top_signal(cumulative_ds=cumulative_ds)
     top_n  = engine.top_n(args.top_n, cumulative_ds=cumulative_ds)

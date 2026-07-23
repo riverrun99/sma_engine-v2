@@ -90,7 +90,27 @@ ticker_backup/
 # Excel snapshots / archives
 *.xlsx
 
-# Outfit discovery — not for distribution
-outfit_discovery.py
+# Outfit discovery — the ENGINE is public (users can run it), but keep the
+# private note, the results/registry data, and the usage guide out of git.
 OUTFIT_DISCOVERY_NOTE.txt
 output/outfit_discovery/
+OUTFIT_DISCOVERY_GUIDE.md
+
+# Internal operating guide — contains proprietary methodology
+ENGINE_GUIDE.md
+
+# Patreon notes & drafts — private content, not code
+patreon_*.md
+patreon_*.docx
+
+# Scratch signal lists
+top50_signals.txt
+
+# Telegram integration — private, not for distribution
+telegram_eod.py
+
+# Remote access guide — private (contains host/network details)
+REMOTE_ACCESS_GUIDE.md
+
+# Google Sheets guide — private
+GOOGLE_SHEETS_GUIDE.md

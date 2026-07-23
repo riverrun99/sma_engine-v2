@@ -246,7 +246,7 @@ class InfluxPersistence:
             except Exception as e:
                 logging.warning(f"InfluxDB write_top_n failed: {e}")
 
-    def query_cumulative_deciseconds(self, window_days: int = 7) -> dict:
+    def query_cumulative_deciseconds(self, window_days: int = 7, tickers: set = None) -> dict:
         """
         Query InfluxDB for cumulative deciseconds per [ticker|TF|outfit_id|sma_period]
         over the last `window_days` days.
@@ -258,15 +258,22 @@ class InfluxPersistence:
         cycles and sessions, so levels that price has visited repeatedly over days
         score higher than levels hit heavily in a single cycle.
 
+        If `tickers` is provided, only load history for those tickers — avoids
+        fetching the full dataset (which grows to 100k+ keys and causes OOM).
+
         Returns empty dict if InfluxDB is unavailable or query fails.
         """
         if not self._connected:
             return {}
+        ticker_filter = ""
+        if tickers:
+            ticker_array = "[" + ", ".join(f'"{t}"' for t in sorted(tickers)) + "]"
+            ticker_filter = f'  |> filter(fn: (r) => contains(value: r.ticker, set: {ticker_array}))\n'
         flux = f"""
 from(bucket: "{self.bucket}")
   |> range(start: -{window_days}d)
   |> filter(fn: (r) => r._measurement == "hits" and r._field == "deciseconds")
-  |> group(columns: ["ticker", "timeframe", "outfit_id", "sma_period"])
+{ticker_filter}  |> group(columns: ["ticker", "timeframe", "outfit_id", "sma_period"])
   |> sum(column: "_value")
 """
         try:

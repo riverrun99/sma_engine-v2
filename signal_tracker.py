@@ -50,7 +50,14 @@ except ImportError as e:
     sys.exit(1)
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-OUTPUT_DIR   = Path(__file__).parent / "output" / "normalized_engine"
+# LOCAL_OUTPUT_DIR is /cache/output inside the container (writable volume);
+# /app is mounted read-only, so Path(__file__).parent/"output" would fail there.
+import os
+_out_base = os.environ.get("LOCAL_OUTPUT_DIR")
+if _out_base:
+    OUTPUT_DIR = Path(_out_base) / "normalized_engine"
+else:
+    OUTPUT_DIR = Path(__file__).parent / "output" / "normalized_engine"
 SIGNAL_LOG   = OUTPUT_DIR / "signal_log.json"
 
 # ── Colour palette ────────────────────────────────────────────────────────────

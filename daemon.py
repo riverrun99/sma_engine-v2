@@ -15,6 +15,7 @@ Designed to run inside the docker-compose stack alongside InfluxDB and Grafana.
 from __future__ import annotations
 
 import os
+import gc
 import time
 import signal
 import logging
@@ -47,7 +48,50 @@ MUTED_TICKERS_PATH  = "/app/muted_tickers.txt"
 CUSTOM_TICKERS_PATH = "/app/custom_tickers.txt"
 
 # Disk cache — persists across restarts via engine_cache Docker volume
-CACHE_DIR = "/Users/riverrun/Developer/sma_engine/cache/candle_cache"
+# /cache is the engine_cache named volume mount point inside the container
+CACHE_DIR = "/cache/candle_cache"
+
+# Full-refresh cadence: every N days, wipe the disk cache so the next cycle
+# re-fetches complete history from Webull. Historical bars are re-adjusted by
+# Webull after corporate actions (splits, adjustments) — the incremental 20-bar
+# top-up never repairs old bars, so without this a split ticker keeps a broken
+# SMA history forever. Cost: one slow (full-prefetch) cycle every N days.
+CACHE_MAX_AGE_DAYS = int(os.environ.get("CACHE_MAX_AGE_DAYS", "7"))
+CACHE_MARKER = os.path.join(CACHE_DIR, ".last_full_refresh")
+
+
+def expire_candle_cache(cache_dir: str = CACHE_DIR,
+                        max_age_days: int = CACHE_MAX_AGE_DAYS) -> None:
+    """
+    Wipe the disk cache if the last full refresh was more than max_age_days ago.
+    Uses a marker file so the age is measured from the last wipe, not file
+    mtimes (files are rewritten every cycle so their mtime is always fresh).
+    """
+    if max_age_days <= 0:
+        return
+    try:
+        os.makedirs(cache_dir, exist_ok=True)
+        now = time.time()
+        if os.path.exists(CACHE_MARKER):
+            age_days = (now - os.path.getmtime(CACHE_MARKER)) / 86400
+            if age_days < max_age_days:
+                return
+            # Expired — remove all cached candles, forcing a full prefetch
+            removed = 0
+            for fname in os.listdir(cache_dir):
+                if fname.endswith(".pkl.gz"):
+                    os.remove(os.path.join(cache_dir, fname))
+                    removed += 1
+            logging.info(
+                f"  cache expired ({age_days:.1f}d old ≥ {max_age_days}d) — "
+                f"wiped {removed} ticker files, next prefetch is a full re-fetch "
+                f"(picks up split-adjusted history)"
+            )
+        # Touch marker (first run or just wiped)
+        with open(CACHE_MARKER, "w") as f:
+            f.write(datetime.now(timezone.utc).isoformat())
+    except Exception as e:
+        logging.warning(f"Cache expiry check failed (non-fatal): {e}")
 
 
 def save_candle_cache(cache: dict, cache_dir: str = CACHE_DIR) -> None:
@@ -215,6 +259,20 @@ def run_cycle(
     # Swap in the effective universe for this cycle only (cfg is not mutated)
     cycle_cfg = dataclasses.replace(cfg, universe=effective_universe)
 
+    # ── Weekly full-refresh check (corporate-action hygiene) ───────────────
+    expire_candle_cache()
+
+    # ── Reload candle cache from disk if cleared after last cycle ──────────
+    # persistent_cache is reset to {} after each cycle to free RAM. Reload it
+    # here so the engine can do 20-bar incremental top-ups instead of a full
+    # Webull re-fetch. On the very first cycle there's nothing on disk yet,
+    # load_candle_cache returns {}, and the engine does a normal full prefetch.
+    if not persistent_cache:
+        persistent_cache = load_candle_cache(active_tickers=set(effective_universe))
+        if persistent_cache:
+            logging.info(f"  candle cache reloaded from disk: "
+                         f"{len(persistent_cache)} (ticker, tf) pairs")
+
     engine = SMAOutfitEngine(
         client, cycle_cfg,
         stream_client=stream_client,
@@ -226,10 +284,14 @@ def run_cycle(
     # ─── Query cumulative deciseconds (time-series persistence across cycles) ─
     # Raul's methodology accumulates deciseconds over days, not just one cycle.
     # Pull the running totals from InfluxDB so the scorer can blend them in.
+    # Filter to only tickers with current hits — avoids loading the full
+    # historical dataset (which grows to 100k+ keys and causes OOM).
+    hit_tickers = {entry.ticker for entry in engine.store.all()}
     try:
-        cumulative_ds = persist.query_cumulative_deciseconds(window_days=7)
+        cumulative_ds = persist.query_cumulative_deciseconds(window_days=7, tickers=hit_tickers)
         if cumulative_ds:
-            logging.info(f"  cumulative_ds: {len(cumulative_ds)} level keys loaded from Influx")
+            logging.info(f"  cumulative_ds: {len(cumulative_ds)} level keys loaded from Influx"
+                         f" ({len(hit_tickers)} tickers with hits)")
     except Exception as e:
         logging.warning(f"  cumulative_ds query failed (non-fatal): {e}")
         cumulative_ds = {}
@@ -321,13 +383,16 @@ def run_cycle(
                      f"hits={signal_dict['hit_count']} "
                      f"conv={signal_dict['convergence']['score']}")
 
-    # Persist cache to disk so restarts don't cold-start
+    # Persist cache to disk, then return {} to free all DataFrames from RAM.
+    # main() holds the return value as persistent_cache — returning the live
+    # cache would keep every DataFrame referenced and prevent GC, causing OOM
+    # after 2 cycles. Next cycle reloads from disk (see reload block above).
     save_candle_cache(engine.candle_cache)
-
-    return current_regime_label, engine.candle_cache
+    return current_regime_label, {}
 
 
 def main():
+    global RUN_NOW
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
@@ -417,11 +482,9 @@ def main():
 
     cycle_count = 0
     current_regime_label: Optional[str] = None
-    # Load cache from disk — filtered to active tickers only to save RAM
-    logging.info("Loading candle cache from disk...")
-    _startup_custom = set(load_ticker_file(CUSTOM_TICKERS_PATH))
-    _active_tickers = set(cfg.universe) | _startup_custom
-    persistent_cache: dict = load_candle_cache(active_tickers=_active_tickers)
+    # Cache starts empty — run_cycle() loads from disk at the start of each cycle
+    # and resets it to {} on return, so DataFrames are GC'd between cycles.
+    persistent_cache: dict = {}
     try:
         while not SHUTDOWN:
             start = time.monotonic()
@@ -438,7 +501,9 @@ def main():
                 )
             except Exception as e:
                 logging.exception(f"Cycle failed: {e}")
-                persistent_cache = {}  # reset cache on crash to avoid stale data
+                persistent_cache = {}
+            # Force GC to collect DataFrames freed by run_cycle returning {}
+            gc.collect()
 
             # ── Auto-backtest ──────────────────────────────────────────────
             if backtest_every > 0 and cycle_count > 0 and cycle_count % backtest_every == 0:
