@@ -87,16 +87,43 @@ info "Main stack (InfluxDB + engine)..."
 cd "$BASE"
 docker-compose up -d 2>&1 | grep -E "Started|Running|Healthy|Created" || true
 
+# Normalized and V3 run as separate compose projects but share the main stack's
+# network. When the main stack restarts it creates a NEW network, so a reused
+# container from a prior run holds a stale network reference and fails to start
+# ("network ... not found") — silently, because it's a separate project.
+# --force-recreate rebuilds them against the current network every time.
 info "Normalized engine..."
-docker-compose -f docker-compose.normalized.yml up -d 2>&1 | grep -E "Started|Running|Created" || true
+docker-compose -f docker-compose.normalized.yml up -d --force-recreate 2>&1 | grep -E "Started|Running|Created|Error" || true
+if ! docker ps --format "{{.Names}}" | grep -q "^e47_engine_normalized$"; then
+    warn "normalized did not start — retrying with a clean container..."
+    docker rm -f e47_engine_normalized 2>/dev/null || true
+    docker-compose -f docker-compose.normalized.yml up -d 2>&1 | grep -E "Started|Error" || true
+fi
 
 info "V3 engine..."
 cd "$BASE/_v3_staging"
-docker-compose -f docker-compose.v3.yml up -d 2>&1 | grep -E "Started|Running|Created" || true
+docker-compose -f docker-compose.v3.yml up -d --force-recreate 2>&1 | grep -E "Started|Running|Created|Error" || true
 cd "$BASE"
+if ! docker ps --format "{{.Names}}" | grep -q "^e47_engine_v3$"; then
+    warn "V3 did not start — retrying with a clean container..."
+    docker rm -f e47_engine_v3 2>/dev/null || true
+    cd "$BASE/_v3_staging"
+    docker-compose -f docker-compose.v3.yml up -d 2>&1 | grep -E "Started|Error" || true
+    cd "$BASE"
+fi
 
 info "Waiting 15s for containers to initialize..."
 sleep 15
+
+# ── Verify all three engines are actually up before proceeding ────────────────
+step "Confirming all engines are running..."
+for c in e47_engine e47_engine_normalized e47_engine_v3; do
+    if docker ps --format "{{.Names}}" | grep -q "^${c}$"; then
+        info "$c ✓"
+    else
+        warn "$c is NOT running — the chain will be incomplete. Check: docker logs $c"
+    fi
+done
 
 echo ""
 docker ps --format "  {{.Names}}\t{{.Status}}" | grep e47 || true
