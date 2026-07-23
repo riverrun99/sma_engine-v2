@@ -84,6 +84,10 @@ services:
       WEBULL_APP_KEY: ${WEBULL_APP_KEY:-}
       WEBULL_APP_SECRET: ${WEBULL_APP_SECRET:-}
       WEBULL_REGION: ${WEBULL_REGION:-us}
+      # Wait for the kickoff SIGUSR1 (from fullrun) before the first scan, so
+      # main scans exactly once per trigger instead of boot-scanning AND being
+      # re-triggered (which caused a redundant second scan at every startup).
+      WAIT_FOR_SIGNAL: ${WAIT_FOR_SIGNAL:-true}
       # Engine config
       ENGINE_SOURCE: ${ENGINE_SOURCE:-mock}
       ENGINE_UNIVERSE: ${ENGINE_UNIVERSE:-tier1}

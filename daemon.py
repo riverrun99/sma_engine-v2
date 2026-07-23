@@ -485,6 +485,22 @@ def main():
     # Cache starts empty — run_cycle() loads from disk at the start of each cycle
     # and resets it to {} on return, so DataFrames are GC'd between cycles.
     persistent_cache: dict = {}
+
+    # ── Cold-start: wait for the first trigger instead of scanning on boot ────
+    # WAIT_FOR_SIGNAL keeps main from boot-scanning. Without it main scans on
+    # boot AND fullrun's SIGUSR1 lands mid-scan, setting RUN_NOW — which then
+    # skips the post-cycle sleep and fires a redundant second scan. Waiting for
+    # the signal consumes that trigger cleanly: main scans exactly once per
+    # trigger. fullrun sends the kickoff SIGUSR1; the coordinator drives every
+    # cycle after. Consistent with normalized and V3.
+    wait_for_signal = os.environ.get("WAIT_FOR_SIGNAL", "false").lower() in ("true", "1", "yes")
+    if wait_for_signal:
+        logging.info("WAIT_FOR_SIGNAL set — holding until first trigger (SIGUSR1) "
+                     "before initial scan")
+        while not RUN_NOW and not SHUTDOWN:
+            time.sleep(2)
+        RUN_NOW = False
+
     try:
         while not SHUTDOWN:
             start = time.monotonic()
