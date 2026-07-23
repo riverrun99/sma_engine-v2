@@ -79,6 +79,10 @@ def main():
     timeframes  = os.environ.get("V3_TIMEFRAMES",
                                  "1m,5m,15m,30m,1h,2h,4h,1d,1w,1mo").split(",")
     source      = os.environ.get("ENGINE_SOURCE", "webull")
+    # When true, don't scan on boot — wait for the coordinator's first SIGUSR1.
+    # Preserves the main→normalized→V3 stagger on a cold start so all three
+    # engines don't scan at once and overrun memory (OOM).
+    wait_for_signal = os.environ.get("WAIT_FOR_SIGNAL", "false").lower() in ("true", "1", "yes")
 
     print("\n" + "═" * 80)
     print("  ENGINE V3 DAEMON")
@@ -92,6 +96,14 @@ def main():
     print("═" * 80 + "\n", flush=True)
 
     cycle = 0
+
+    # ── Cold-start stagger: wait for the coordinator's first trigger ──────────
+    if wait_for_signal:
+        logging.info("  WAIT_FOR_SIGNAL set — holding until coordinator triggers "
+                     "(SIGUSR1) before first scan (preserves cold-start stagger)")
+        while not RUN_NOW and not SHUTDOWN:
+            time.sleep(2)
+        RUN_NOW = False
 
     while not SHUTDOWN:
         cycle += 1

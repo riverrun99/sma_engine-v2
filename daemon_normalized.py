@@ -95,6 +95,11 @@ def main():
         "1m,5m,15m,30m,1h,2h,4h,1d,1w,1mo"
     ).split(",")
     source       = os.environ.get("ENGINE_SOURCE", "webull")
+    # When true, don't scan on boot — wait for the coordinator's first SIGUSR1.
+    # This preserves the main→normalized→V3 stagger on a COLD START. Without it,
+    # every engine runs its first scan the instant its container boots, so a
+    # fresh `fullrun` has all three scanning at once and overruns memory (OOM).
+    wait_for_signal = os.environ.get("WAIT_FOR_SIGNAL", "false").lower() in ("true", "1", "yes")
 
     # ── Startup banner ────────────────────────────────────────────────────────
     print("\n" + "═" * 71)
@@ -109,6 +114,15 @@ def main():
     print("═" * 71 + "\n")
 
     cycle = 0
+
+    # ── Cold-start stagger: wait for the coordinator's first trigger ──────────
+    # so we don't scan simultaneously with the other engines on boot.
+    if wait_for_signal:
+        logging.info("  WAIT_FOR_SIGNAL set — holding until coordinator triggers "
+                     "(SIGUSR1) before first scan (preserves cold-start stagger)")
+        while not RUN_NOW and not SHUTDOWN:
+            time.sleep(2)
+        RUN_NOW = False
 
     while not SHUTDOWN:
         cycle += 1

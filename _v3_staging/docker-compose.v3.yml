@@ -36,6 +36,9 @@ services:
       # ── Webull (loaded from ../.env via env_file) ────────────────────────
       WEBULL_REGION:     us
       ENGINE_SOURCE:     webull
+      # Wait for the coordinator's first SIGUSR1 before the initial scan, so a
+      # cold start staggers (main → normalized → V3) instead of all at once.
+      WAIT_FOR_SIGNAL:   ${WAIT_FOR_SIGNAL:-true}
       # ── V3 settings ──────────────────────────────────────────────────────
       V3_INTERVAL_SECONDS: ${V3_INTERVAL_SECONDS:-7800}
       V3_TOP_N:            ${V3_TOP_N:-500}

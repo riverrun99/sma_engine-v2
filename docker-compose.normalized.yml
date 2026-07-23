@@ -38,6 +38,10 @@ services:
       ENGINE_SOURCE: webull
       PYTHONUNBUFFERED: "1"
       GOOGLE_SHEETS_CREDENTIALS_PATH: /credentials/sheets.json
+      # Wait for the coordinator's first SIGUSR1 before the initial scan, so a
+      # cold start staggers (main → normalized → V3) instead of all scanning at
+      # once and OOM-ing. The coordinator triggers this ~180s after main.
+      WAIT_FOR_SIGNAL: ${WAIT_FOR_SIGNAL:-true}
       # ── Normalized engine settings ────────────────────────────────────────
       NORM_INTERVAL_SECONDS: ${NORM_INTERVAL_SECONDS:-7800}
       NORM_TOP_N: ${NORM_TOP_N:-2000}
