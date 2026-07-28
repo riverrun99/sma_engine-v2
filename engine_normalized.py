@@ -130,6 +130,7 @@ OUTFITS: list[dict] = [
     {"id": 40, "periods": [10, 50, 200],                         "name": "S&P"},
     {"id": 41, "periods": [16, 32, 65, 160, 320, 650],           "name": "HV"},
     {"id": 42, "periods": [15, 59, 118, 236, 472, 944],          "name": "59th UK PM"},
+    {"id": 43, "periods": [21, 42, 83, 116, 332, 664],           "name": "SPYU 4X"},
 ]
 
 # Per blueprint Section 5 — 8 systems monitored continuously.

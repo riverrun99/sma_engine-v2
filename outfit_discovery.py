@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import csv
 import gzip
+import math
 import pickle
 import argparse
 import logging
@@ -40,6 +41,27 @@ logging.basicConfig(
     format="%(asctime)s [outfit_discovery] %(message)s",
     datefmt="%H:%M:%S",
 )
+
+# ── Rounding mode ─────────────────────────────────────────────────────────────
+# How fractional SMA periods (base × ratio^i) become integers. Python's built-in
+# round() is half-to-even (banker's), which rounds some .5 cases DOWN. Set the
+# mode via --round to experiment with how the generated outfits change:
+#   nearest  — int(round(x))        (default; half-to-even on exact .5)
+#   up       — math.ceil(x)         (always round fractional up)
+#   down     — math.floor(x)        (always round fractional down)
+#   half-up  — math.floor(x + 0.5)  (round half AWAY from zero — standard rounding)
+_ROUND_MODE = "nearest"
+
+
+def _rnd(x: float) -> int:
+    """Convert a fractional period to int per the active rounding mode."""
+    if _ROUND_MODE == "up":
+        return int(math.ceil(x))
+    if _ROUND_MODE == "down":
+        return int(math.floor(x))
+    if _ROUND_MODE == "half-up":
+        return int(math.floor(x + 0.5))
+    return int(round(x))
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 CACHE_DIR  = "/cache/candle_cache"
@@ -88,26 +110,26 @@ REGISTRY_PATH = Path("./output/outfit_discovery/all_novel_outfits.csv")
 
 def _seq_ratio(seed: int, m: float, n: int = 6) -> tuple[int, ...]:
     """seed × m^i — the seed is the SHORTEST period."""
-    return tuple(sorted(set(int(round(seed * (m ** i))) for i in range(n))))
+    return tuple(sorted(set(_rnd(seed * (m ** i)) for i in range(n))))
 
 
 def _seq_ratio_anchor(seed: int, m: float, n: int = 6) -> tuple[int, ...]:
     """seed ÷ m^i — the seed is the LONGEST period (anchor a discovered level
     like MA288 at the top and derive the shorter periods underneath it)."""
-    return tuple(sorted(set(int(round(seed / (m ** i))) for i in range(n))))
+    return tuple(sorted(set(_rnd(seed / (m ** i)) for i in range(n))))
 
 
 def _seq_fib(seed: int, n: int = 6) -> tuple[int, ...]:
     """Fibonacci ratio chain from the seed: seed × (1,2,3,5,8,13)."""
     ratios = [1, 2, 3, 5, 8, 13][:n]
-    return tuple(sorted(set(int(round(seed * r)) for r in ratios)))
+    return tuple(sorted(set(_rnd(seed * r) for r in ratios)))
 
 
 def _seq_fib_anchor(seed: int, n: int = 6) -> tuple[int, ...]:
     """Fibonacci chain with the seed as the LONGEST period: seed × (1,2,3,5,8,13)/13."""
     ratios = [1, 2, 3, 5, 8, 13][:n]
     top = ratios[-1]
-    return tuple(sorted(set(int(round(seed * r / top)) for r in ratios)))
+    return tuple(sorted(set(_rnd(seed * r / top) for r in ratios)))
 
 
 SEQUENCE_FAMILIES: dict[str, tuple[str, callable]] = {
@@ -135,7 +157,7 @@ def seq_custom_fx(expr: str):
             try:
                 v = eval(expr, {"__builtins__": {}},
                          {"x": seed, "i": i, "math": _math})
-                vals.add(int(round(float(v))))
+                vals.add(_rnd(float(v)))
             except Exception:
                 return ()
         return tuple(sorted(vals))
@@ -223,7 +245,7 @@ def seeds_from_entry_prices(top: int = 20) -> list[int]:
                 t = str(row[1] or "")
                 if t in prices and t not in seen:
                     seen.add(t)
-                    p = int(round(prices[t]))
+                    p = _rnd(prices[t])
                     if 2 <= p <= 999:
                         seeds.append(p)
                 if len(seeds) >= top:
@@ -350,7 +372,7 @@ def generate_candidates(
 
     def add_geometric(base: int, m: float) -> None:
         periods = tuple(sorted(set(
-            int(round(base * (m ** i))) for i in range(n_periods)
+            _rnd(base * (m ** i)) for i in range(n_periods)
         )))
         if (len(periods) == n_periods
                 and min(periods) >= 2
@@ -383,7 +405,7 @@ def generate_candidates(
     #    neighbourhood of proven structures.
     for seed in load_registry_seeds():
         for scale in (0.9, 0.95, 1.05, 1.1):
-            periods = tuple(sorted(set(int(round(p * scale)) for p in seed)))
+            periods = tuple(sorted(set(_rnd(p * scale) for p in seed)))
             if (len(periods) == n_periods and min(periods) >= 2
                     and max(periods) <= max_period):
                 candidates.add(periods)
@@ -631,7 +653,18 @@ def main():
     parser.add_argument("--seeds", type=str, default=None,
                         help="Non-interactive: comma-separated seed ints, or "
                              "'influx' / 'prices' / 'registry'")
+    parser.add_argument("--round", dest="round_mode", type=str, default="nearest",
+                        choices=["nearest", "up", "down", "half-up"],
+                        help="How fractional SMA periods become integers: "
+                             "nearest (default, banker's), up (ceil), down (floor), "
+                             "half-up (round .5 away from zero)")
     args = parser.parse_args()
+
+    # Set the global rounding mode used by _rnd() everywhere
+    global _ROUND_MODE
+    _ROUND_MODE = args.round_mode
+    if _ROUND_MODE != "nearest":
+        logging.info(f"Rounding mode: {_ROUND_MODE}")
 
     tickers    = [t.strip() for t in args.tickers.split(",") if t.strip()]
     timeframes = [tf.strip() for tf in args.timeframes.split(",") if tf.strip()]
