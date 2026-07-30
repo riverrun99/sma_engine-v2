@@ -977,5 +977,21 @@ def main():
     console.print("\n[dim]Overlay stopped.[/dim]")
 
 
+def snapshot_once():
+    """Compute the system state once and write latest_snapshot.json, then exit.
+    No live UI. Used by eod.sh / fullrun.sh to refresh the snapshot right before
+    the Telegram EOD builds its message, so the system header is never stale."""
+    console.print("[dim]Refreshing market snapshot (one-shot)...[/dim]")
+    try:
+        fetch_all()   # computes system/gamma/macro/signals and calls write_snapshot()
+        console.print("[green]Snapshot written: latest_snapshot.json[/green]")
+    except Exception as e:
+        console.print(f"[yellow]Snapshot refresh failed: {e}[/yellow]")
+
+
 if __name__ == "__main__":
-    main()
+    import sys as _sys
+    if "--snapshot" in _sys.argv or "--once" in _sys.argv:
+        snapshot_once()
+    else:
+        main()

@@ -195,6 +195,9 @@ python3 "$BASE/market_overlay/sheets_sync.py" 2>&1 | tail -5
 
 step "  [5/5] Telegram EOD..."
 if [[ -f "$BASE/telegram_eod.py" ]]; then
+  # Refresh the system snapshot first so the EOD header is current, not stale.
+  info "Refreshing market snapshot before Telegram..."
+  python3 "$BASE/market_overlay/overlay.py" --snapshot 2>&1 | tail -2
   python3 "$BASE/telegram_eod.py" 2>&1 | tail -5
 else
   info "telegram_eod.py not present — skipping Telegram notification"
