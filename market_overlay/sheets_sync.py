@@ -244,6 +244,7 @@ def build_triangulation_rows() -> list[list]:
         from triangulator import (
             read_original, read_normalized, read_v3,
             read_discovery, read_confluence, read_trades,
+            read_backtest, read_snapshot,
             triangulate,
         )
         orig  = read_original()
@@ -252,7 +253,9 @@ def build_triangulation_rows() -> list[list]:
         disc  = read_discovery()
         conf  = read_confluence()
         trade = read_trades()
-        signals = triangulate(orig, norm, v3, disc, conf, trade)
+        bt    = read_backtest()
+        snap  = read_snapshot()
+        signals = triangulate(orig, norm, v3, disc, conf, trade, bt, snap)
 
         rows = [
             ["TRIANGULATION — Top Signals"],
